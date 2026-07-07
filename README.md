@@ -1,47 +1,62 @@
 <div align="center">
 
-# flinks-node
+<h1>
+  <br>
+  🏦&nbsp; flinks-node
+  <br>
+</h1>
 
-**A modern, fully-typed [Flinks](https://flinks.com) API client for Node.js & Bun.**
+### The modern, fully-typed [Flinks](https://flinks.com) API client for Node.js &amp; Bun
 
-Every product. Every endpoint. Zero runtime dependencies.
+**Every product. Every endpoint. Zero runtime dependencies.**
 
-[![Types](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](#)
-[![Runtime](https://img.shields.io/badge/runtime-Node%2018%2B%20%7C%20Bun-000?logo=bun&logoColor=white)](#)
-[![Deps](https://img.shields.io/badge/dependencies-0-success)](#)
-[![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
+<br>
+
+[![npm](https://img.shields.io/badge/npm-flinks--node-CB3837?style=for-the-badge&logo=npm&logoColor=white)](https://www.npmjs.com/package/flinks-node)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](#)
+[![Runtime](https://img.shields.io/badge/Node_18+_·_Bun-000000?style=for-the-badge&logo=bun&logoColor=white)](#)
+
+![Dependencies](https://img.shields.io/badge/dependencies-0-2EA043?style=flat-square)
+![Bundle](https://img.shields.io/badge/ESM_+_CJS-tree--shakeable-8957E5?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-44_passing-2EA043?style=flat-square&logo=vitest&logoColor=white)
+![Coverage](https://img.shields.io/badge/products-9%2F9-0969DA?style=flat-square)
+![License](https://img.shields.io/badge/license-MIT-0969DA?style=flat-square)
 
 </div>
 
+> [!NOTE]
 > **Community project — not affiliated with, endorsed by, or maintained by Flinks.**
 > "Flinks" is a trademark of its owner; this is an independent, unofficial client.
 
 ---
 
-## Why this exists
+## ✨ Why this exists
 
-The Flinks REST API is powerful but sprawling — seven products across three hosts,
+The Flinks REST API is powerful but sprawling — **seven products across three hosts**,
 three auth schemes, PascalCase here and snake_case there, and an async 202-then-poll
-dance on every heavy endpoint. This library hides all of that behind one typed client
-so you write **less code** and hit **fewer edge cases**.
+dance on every heavy endpoint. `flinks-node` hides all of that behind **one typed
+client** so you write less code and hit fewer edge cases.
 
-- 🧩 **Complete coverage** — Connect, Authorize, Enrich, Upload, Pay, Open Banking, and data-sharing utilities.
-- 🔤 **Idiomatic casing** — you speak camelCase; the wire format is handled for you.
-- ⏳ **Async, solved** — `getAccountsDetailAndWait()` runs the whole 202 → poll → 200 flow in one call.
-- 🛡️ **Typed errors** — every failure is a `FlinksError` with a stable `flinksCode` and a plain-English description.
-- 🔁 **Resilient** — automatic retries with backoff on 429/5xx, request timeouts, constant-time webhook verification.
-- 🪶 **Tiny & fast** — native `fetch`, zero dependencies, tree-shakeable ESM + CJS.
+|  |  |
+| --- | --- |
+| 🧩 **Complete coverage** | Connect · Authorize · Enrich · Identity · Upload · Pay · Open Banking · Utilities |
+| ⏳ **Async, solved** | `getAccountDetails()` runs authorize → MFA → 202-poll → data in **one call** |
+| 🔤 **Idiomatic casing** | you speak camelCase; PascalCase/snake_case on the wire is handled |
+| 🛡️ **Typed errors** | every failure is a `FlinksError` with a stable `flinksCode` + plain-English description |
+| 🔁 **Safe & resilient** | backoff retries on 429/5xx — **never** silently retries a payment POST |
+| 🔐 **Webhooks built in** | constant-time HMAC verify + typed events |
+| ⚛️ **Next.js & React** | secure server route + typed browser client + Connect-widget hook |
+| 🪶 **Tiny & fast** | native `fetch`, **zero** dependencies, tree-shakeable ESM + CJS |
 
-## Install
+## 📦 Install
 
 ```bash
-bun add flinks-node
-# or: npm install flinks-node
+bun add flinks-node        # or: npm i flinks-node  ·  pnpm add flinks-node
 ```
 
 Requires Node 18+ or Bun (anything with a global `fetch`).
 
-## Try it right now (public sandbox)
+## 🚀 Try it right now (public sandbox)
 
 Flinks publishes a shared Toolbox sandbox. This exact snippet runs as-is:
 
@@ -70,7 +85,7 @@ if (result.status === 'done') {
 
 `bun run examples/quickstart.ts` runs it; `bun run test:sandbox` runs the live suite.
 
-## Quickstart (your account)
+## ⚡ Quickstart (your account)
 
 ```ts
 const flinks = new FlinksClient({
@@ -116,7 +131,7 @@ Flinks uses two keys, and this library routes each to the right place automatica
 | **x-api-key** | `x-api-key` | all data endpoints (accounts, statements, enrich) |
 | HMAC secret | — | verifying inbound webhooks |
 
-## Next.js & React — the whole integration in ~15 lines
+## ⚛️ Next.js & React — the whole integration in ~15 lines
 
 Your API secret must never touch the browser. This library gives you a secure
 server route and a typed browser client that talks to it — so your React code
@@ -130,7 +145,8 @@ import { createFlinksHandler } from 'flinks-node/next';
 export const { POST } = createFlinksHandler({
   instance: 'toolbox',
   customerId: process.env.FLINKS_CUSTOMER_ID!,
-  apiSecret: process.env.FLINKS_API_SECRET!,
+  secretKey: process.env.FLINKS_SECRET_KEY!,
+  xApiKey: process.env.FLINKS_X_API_KEY!,
   // Only these methods are reachable from the browser:
   allow: ['authorize.authorize', 'connect.getAccountsDetailAndWait'],
 });
@@ -175,7 +191,7 @@ links the bank and returns a `loginId` → **server** calls `getAccountDetails({
 > The `/next` handler uses only web-standard `Request`/`Response`, so the same
 > one-liner works in Remix, Hono, Bun.serve, and edge runtimes too.
 
-## The async flow, done right
+## ⏳ The async flow, done right
 
 Heavy Flinks endpoints reply `202 OPERATION_PENDING` while the bank is being read,
 and expect you to poll a companion endpoint every 10 seconds for up to 30 minutes.
@@ -200,7 +216,7 @@ const done = isPending(first)
   : first;
 ```
 
-## Handling MFA
+## 🔐 Handling MFA
 
 When a bank challenges the login, `authorize()` returns `httpStatusCode: 203` with
 `securityChallenges`. Answer them by calling `authorize()` again with the same
@@ -218,7 +234,7 @@ while (res.httpStatusCode === 203) {
 }
 ```
 
-## Typed errors
+## 🛡️ Typed errors
 
 ```ts
 import { FlinksError } from 'flinks-node';
@@ -234,7 +250,7 @@ try {
 }
 ```
 
-## Webhooks
+## 🪝 Webhooks
 
 **Registering:** Flinks has no self-serve webhook API. You enable webhooks by
 opening a [Flinks Support](https://help.flinks.com/support/home) ticket with your
@@ -271,7 +287,7 @@ Verification is constant-time, so signatures can't be brute-forced by timing.
 Your custom `Tag` and the Flinks `loginId` come through on the event for
 correlating to your own records.
 
-## Product coverage
+## 🧩 Product coverage
 
 Every namespace hangs off the one client:
 
@@ -290,7 +306,7 @@ Every namespace hangs off the one client:
 Plus the top-level `getAccountDetails` / `getAccountSummary` one-call helpers, and
 webhook verification (`handleFlinksWebhook`).
 
-## Configuration
+## ⚙️ Configuration
 
 ```ts
 new FlinksClient({
@@ -308,7 +324,7 @@ new FlinksClient({
 });
 ```
 
-## Test against your sandbox
+## 🧪 Test against your sandbox
 
 The default `bun run test` suite is fully offline. The live suite hits Flinks'
 public sandbox with no setup:
@@ -327,7 +343,7 @@ FLINKS_X_API_KEY=your-x-api-key \
 bun run test:sandbox
 ```
 
-## Development
+## 🛠️ Development
 
 ```bash
 bun install
@@ -336,6 +352,6 @@ bun run test        # vitest (offline)
 bun run build       # tsup → dist (ESM + CJS + d.ts)
 ```
 
-## License
+## 📄 License
 
 MIT © Rafey
