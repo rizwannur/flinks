@@ -40,7 +40,10 @@
     "test:sandbox": "RUN_SANDBOX=1 vitest run tests/sandbox.test.ts",
     "lint": "eslint \"src/**/*.ts\"",
     "format": "prettier --write \"**/*.{ts,json,md}\"",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "release:patch": "npm version patch && git push --follow-tags",
+    "release:minor": "npm version minor && git push --follow-tags",
+    "release:major": "npm version major && git push --follow-tags"
   },
   "keywords": [
     "flinks",
