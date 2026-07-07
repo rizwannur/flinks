@@ -95,6 +95,31 @@ describe('FlinksClient wiring', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('does NOT retry a non-idempotent POST on 503 (no double side effects)', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(503, {}))
+      .mockResolvedValueOnce(jsonResponse(200, { HttpStatusCode: 200 }));
+    const flinks = makeClient(fetchMock as unknown as typeof fetch);
+
+    // getAccountsSummary is a POST — a 503 must surface, not silently retry.
+    await expect(flinks.connect.getAccountsSummary({ requestId: 'r' })).rejects.toBeInstanceOf(
+      FlinksError,
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does retry a POST on 429 (never processed, so safe)', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(429, {}))
+      .mockResolvedValueOnce(jsonResponse(200, { HttpStatusCode: 200, Accounts: [] }));
+    const flinks = makeClient(fetchMock as unknown as typeof fetch);
+
+    await flinks.connect.getAccountsSummary({ requestId: 'r' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('does not retry a FlinksError (4xx)', async () => {
     const fetchMock = vi.fn(async () => jsonResponse(400, { FlinksCode: 'INVALID_REQUEST' }));
     const flinks = makeClient(fetchMock as unknown as typeof fetch);

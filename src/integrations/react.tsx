@@ -85,7 +85,19 @@ export interface FlinksConnectEvent {
 export interface UseFlinksConnectOptions {
   /** Your Flinks Connect instance subdomain (e.g. `toolbox`, `yourco`). */
   instance: string;
-  /** Extra query params for the widget URL (language, theme, etc.). */
+  /**
+   * The authorize token from your backend (`GenerateAuthorizeToken`). Required
+   * to fetch account data through the widget. Never expose your secret key —
+   * mint the token server-side and pass only the token here.
+   */
+  authorizeToken?: string;
+  /** Sandbox mode — adds `demo=true` so the Flinks Capital test bank appears. */
+  demo?: boolean;
+  /** Where Flinks redirects after linking (also arrives via postMessage). */
+  redirectUrl?: string;
+  /** Your custom tag, echoed back in webhooks and events for correlation. */
+  tag?: string;
+  /** Any additional widget query params (language, theme, feature flags). */
   params?: Record<string, string>;
   /** Fired when a user finishes linking — `event.loginId` is what you want. */
   onSuccess?: (event: FlinksConnectEvent) => void;
@@ -107,15 +119,19 @@ export interface UseFlinksConnectOptions {
  * ```
  */
 export function useFlinksConnect(options: UseFlinksConnectOptions): { iframeUrl: string } {
-  const { instance, params, onSuccess, onEvent } = options;
+  const { instance, authorizeToken, demo, redirectUrl, tag, params, onSuccess, onEvent } = options;
 
   const iframeUrl = useMemo(() => {
     const url = new URL(`https://${instance}-iframe.private.fin.ag/v2/`);
+    if (demo) url.searchParams.set('demo', 'true');
+    if (authorizeToken) url.searchParams.set('authorizeToken', authorizeToken);
+    if (redirectUrl) url.searchParams.set('redirectUrl', redirectUrl);
+    if (tag) url.searchParams.set('tag', tag);
     for (const [key, value] of Object.entries(params ?? {})) {
       url.searchParams.set(key, value);
     }
     return url.toString();
-  }, [instance, params]);
+  }, [instance, authorizeToken, demo, redirectUrl, tag, params]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

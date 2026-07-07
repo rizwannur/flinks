@@ -100,27 +100,6 @@ export class ConnectApi {
     });
   }
 
-  getStatementsAsync(requestId: string): Promise<StatementsResponse> {
-    return this.http.request({
-      method: 'GET',
-      path: `${this.basePath}/GetStatementsAsync/${requestId}`,
-      endpoint: 'getStatementsAsync',
-    });
-  }
-
-  /**
-   * Request statements and, if Flinks answers `202`, poll until they are ready
-   * — the full async flow in a single call.
-   */
-  async getStatementsAndWait(
-    options: GetStatementsOptions,
-    pollOptions?: PollOptions,
-  ): Promise<StatementsResponse> {
-    const first = await this.getStatements(options);
-    if (!isPending(first)) return first;
-    return poll(() => this.getStatementsAsync(options.requestId), pollOptions);
-  }
-
   getMfaQuestions(loginId: string): Promise<MfaQuestionsResponse> {
     return this.http.request({
       method: 'GET',

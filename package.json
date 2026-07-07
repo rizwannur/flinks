@@ -1,7 +1,7 @@
 {
-  "name": "@rafey/flinks",
+  "name": "flinks-node",
   "version": "0.1.0",
-  "description": "A modern, fully-typed Flinks API client for Node.js and Bun — covering Connect, Authorize, Enrich, Upload, Pay, and Open Banking.",
+  "description": "Community (unofficial) modern, fully-typed Flinks API client for Node.js and Bun — Connect, Authorize, Enrich, Identity, Upload, Pay, and Open Banking.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -51,6 +51,14 @@
   ],
   "author": "Rafey",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rizwannur/flinks-node.git"
+  },
+  "homepage": "https://github.com/rizwannur/flinks-node#readme",
+  "bugs": {
+    "url": "https://github.com/rizwannur/flinks-node/issues"
+  },
   "peerDependencies": {
     "react": ">=18"
   },
