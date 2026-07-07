@@ -1,6 +1,9 @@
 {
-  "name": "flinks-node",
+  "name": "@rizwannur/flinks-node",
   "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "Community (unofficial) modern, fully-typed Flinks API client for Node.js and Bun — Connect, Authorize, Enrich, Identity, Upload, Pay, and Open Banking.",
   "type": "module",
   "main": "./dist/index.cjs",

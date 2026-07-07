@@ -12,7 +12,7 @@
 
 <br>
 
-[![npm](https://img.shields.io/badge/npm-flinks--node-CB3837?style=for-the-badge&logo=npm&logoColor=white)](https://www.npmjs.com/package/flinks-node)
+[![npm](https://img.shields.io/badge/npm-%40rizwannur%2Fflinks--node-CB3837?style=for-the-badge&logo=npm&logoColor=white)](https://www.npmjs.com/package/@rizwannur/flinks-node)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](#)
 [![Runtime](https://img.shields.io/badge/Node_18+_·_Bun-000000?style=for-the-badge&logo=bun&logoColor=white)](#)
 
@@ -51,7 +51,7 @@ client** so you write less code and hit fewer edge cases.
 ## 📦 Install
 
 ```bash
-bun add flinks-node        # or: npm i flinks-node  ·  pnpm add flinks-node
+bun add @rizwannur/flinks-node        # or: npm i @rizwannur/flinks-node  ·  pnpm add @rizwannur/flinks-node
 ```
 
 Requires Node 18+ or Bun (anything with a global `fetch`).
@@ -61,7 +61,7 @@ Requires Node 18+ or Bun (anything with a global `fetch`).
 Flinks publishes a shared Toolbox sandbox. This exact snippet runs as-is:
 
 ```ts
-import { FlinksClient } from 'flinks-node';
+import { FlinksClient } from '@rizwannur/flinks-node';
 
 const flinks = new FlinksClient({
   instance: 'toolbox',
@@ -140,7 +140,7 @@ calls Flinks methods directly, and the secret stays on the server.
 **1. Server route** (`app/api/flinks/route.ts`):
 
 ```ts
-import { createFlinksHandler } from 'flinks-node/next';
+import { createFlinksHandler } from '@rizwannur/flinks-node/next';
 
 export const { POST } = createFlinksHandler({
   instance: 'toolbox',
@@ -156,7 +156,7 @@ export const { POST } = createFlinksHandler({
 
 ```ts
 'use client';
-import { createFlinksClient } from 'flinks-node/react';
+import { createFlinksClient } from '@rizwannur/flinks-node/react';
 
 const flinks = createFlinksClient(); // POSTs to /api/flinks
 
@@ -170,7 +170,7 @@ receive the `loginId` when the user finishes:
 
 ```tsx
 'use client';
-import { useFlinksConnect } from 'flinks-node/react';
+import { useFlinksConnect } from '@rizwannur/flinks-node/react';
 
 export function LinkBank({ authorizeToken }: { authorizeToken: string }) {
   const { iframeUrl } = useFlinksConnect({
@@ -208,7 +208,7 @@ const summary = await flinks.connect.getAccountsSummaryAndWait(
 Prefer to drive it yourself? The low-level pieces are all public:
 
 ```ts
-import { poll, isPending } from 'flinks-node';
+import { poll, isPending } from '@rizwannur/flinks-node';
 
 const first = await flinks.connect.getAccountsDetail({ requestId });
 const done = isPending(first)
@@ -237,7 +237,7 @@ while (res.httpStatusCode === 203) {
 ## 🛡️ Typed errors
 
 ```ts
-import { FlinksError } from 'flinks-node';
+import { FlinksError } from '@rizwannur/flinks-node';
 
 try {
   await flinks.connect.getAccountsSummary({ requestId });
@@ -262,7 +262,7 @@ intervals — so verify fast and return `200`.
 `flinks-authenticity-key` header) and get a typed, camelCased event:
 
 ```ts
-import { handleFlinksWebhook } from 'flinks-node';
+import { handleFlinksWebhook } from '@rizwannur/flinks-node';
 
 export async function POST(req: Request) {
   const raw = await req.text(); // exact bytes — never re-serialize
