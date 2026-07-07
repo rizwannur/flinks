@@ -16,6 +16,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](#)
 [![Runtime](https://img.shields.io/badge/Node_18+_·_Bun-000000?style=for-the-badge&logo=bun&logoColor=white)](#)
 
+[![CI](https://img.shields.io/github/actions/workflow/status/rizwannur/flinks-node/ci.yml?style=flat-square&label=CI&logo=github)](https://github.com/rizwannur/flinks-node/actions/workflows/ci.yml)
 ![Dependencies](https://img.shields.io/badge/dependencies-0-2EA043?style=flat-square)
 ![Bundle](https://img.shields.io/badge/ESM_+_CJS-tree--shakeable-8957E5?style=flat-square)
 ![Tests](https://img.shields.io/badge/tests-44_passing-2EA043?style=flat-square&logo=vitest&logoColor=white)
