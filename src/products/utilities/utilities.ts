@@ -36,4 +36,13 @@ export class UtilitiesApi {
       endpoint: 'disableAuthSecret',
     });
   }
+
+  /** Re-enable a previously disabled partner access, by its PermissionId. */
+  enableAuthSecret(permissionId: string): Promise<AuthSecretResponse> {
+    return this.http.request({
+      method: 'GET',
+      path: `${this.customerBase}/partnerdata/authsecret/enable/${permissionId}`,
+      endpoint: 'enableAuthSecret',
+    });
+  }
 }

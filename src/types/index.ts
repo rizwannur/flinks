@@ -22,6 +22,8 @@ export interface FlinksConfig {
   xApiKey?: string;
   /** Your **HMAC secret**, used to verify inbound webhook signatures. */
   hmacSecret?: string;
+  /** Flinks Pay **x-client-id** API key, for the legacy V1 EFT endpoints. */
+  payClientId?: string;
   /**
    * A pre-obtained authorize token to reuse across `/Authorize` calls. If
    * omitted, one is minted automatically from `secretKey` when needed.
@@ -40,12 +42,14 @@ export interface FlinksConfig {
 }
 
 export interface FlinksHosts {
-  /** BankingServices, Enrich, Upload, Utilities. */
+  /** BankingServices, Enrich, Upload, Utilities, Identity. */
   banking: string;
   /** Flinks Pay. */
   pay: string;
   /** Open Banking (Outbound). */
   outbound: string;
+  /** Wealth / Investments (deprecated, separate host). */
+  wealth: string;
 }
 
 /** Every Flinks response carries these. */
