@@ -353,6 +353,11 @@ bun run test        # vitest (offline)
 bun run build       # tsup → dist (ESM + CJS + d.ts)
 ```
 
+## 🤝 Contributing
+
+Bug fixes, new endpoints, and docs are all welcome — see
+[CONTRIBUTING.md](./CONTRIBUTING.md). CI must pass (`typecheck` · `build` · `test`).
+
 ## 📄 License
 
-MIT © Rafey
+[MIT](./LICENSE) © Rafey. Community project — not affiliated with Flinks.
