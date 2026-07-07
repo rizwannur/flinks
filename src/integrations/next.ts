@@ -6,7 +6,7 @@
  *
  * ```ts
  * // app/api/flinks/route.ts
- * import { createFlinksHandler } from 'flinks-node/next';
+ * import { createFlinksHandler } from '@rizwannur/flinks-node/next';
  *
  * export const { POST } = createFlinksHandler({
  *   instance: 'toolbox',
