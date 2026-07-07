@@ -1,0 +1,50 @@
+{
+  "name": "@rafey/flinks",
+  "version": "0.1.0",
+  "description": "A modern, fully-typed Flinks API client for Node.js and Bun — covering Connect, Authorize, Enrich, Upload, Pay, and Open Banking.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:sandbox": "vitest run tests/sandbox.test.ts",
+    "lint": "eslint \"src/**/*.ts\"",
+    "format": "prettier --write \"**/*.{ts,json,md}\"",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "flinks",
+    "banking",
+    "fintech",
+    "open-banking",
+    "financial-data",
+    "api-client",
+    "typescript",
+    "bun"
+  ],
+  "author": "Rafey",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
