@@ -63,6 +63,58 @@ for (const account of detail.accounts ?? []) {
 }
 ```
 
+## Next.js & React — the whole integration in ~15 lines
+
+Your API secret must never touch the browser. This library gives you a secure
+server route and a typed browser client that talks to it — so your React code
+calls Flinks methods directly, and the secret stays on the server.
+
+**1. Server route** (`app/api/flinks/route.ts`):
+
+```ts
+import { createFlinksHandler } from '@rafey/flinks/next';
+
+export const { POST } = createFlinksHandler({
+  instance: 'toolbox',
+  customerId: process.env.FLINKS_CUSTOMER_ID!,
+  apiSecret: process.env.FLINKS_API_SECRET!,
+  // Only these methods are reachable from the browser:
+  allow: ['authorize.authorize', 'connect.getAccountsDetailAndWait'],
+});
+```
+
+**2. Browser client** — same methods, same types, zero fetch boilerplate:
+
+```ts
+'use client';
+import { createFlinksClient } from '@rafey/flinks/react';
+
+const flinks = createFlinksClient(); // POSTs to /api/flinks
+
+const detail = await flinks.connect.getAccountsDetailAndWait({ requestId });
+//    ^ fully typed — autocomplete and return types, in the browser
+```
+
+**3. Let users link their bank** with the Connect widget hook:
+
+```tsx
+'use client';
+import { useFlinksConnect } from '@rafey/flinks/react';
+
+export function LinkBank() {
+  const { iframeUrl } = useFlinksConnect({
+    instance: 'toolbox',
+    onSuccess: ({ loginId }) => {
+      // send loginId to your server → authorize → fetch data
+    },
+  });
+  return <iframe src={iframeUrl} width="100%" height={600} />;
+}
+```
+
+> The `/next` handler uses only web-standard `Request`/`Response`, so the same
+> one-liner works in Remix, Hono, Bun.serve, and edge runtimes too.
+
 ## The async flow, done right
 
 Heavy Flinks endpoints reply `202 OPERATION_PENDING` while the bank is being read,
