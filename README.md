@@ -38,30 +38,80 @@ bun add @rafey/flinks
 
 Requires Node 18+ or Bun (anything with a global `fetch`).
 
-## Quickstart
+## Try it right now (public sandbox)
+
+Flinks publishes a shared Toolbox sandbox. This exact snippet runs as-is:
 
 ```ts
 import { FlinksClient } from '@rafey/flinks';
 
 const flinks = new FlinksClient({
-  instance: 'toolbox',           // toolbox | sandbox | production
-  customerId: 'your-customer-guid',
-  apiSecret: 'your-api-secret',
+  instance: 'toolbox',
+  customerId: '43387ca6-0391-4c82-857d-70d95f087ecb',
+  secretKey: 'c4569c54-e167-4d34-8de6-f4113bc82414', // mints authorize tokens
+  xApiKey: '3d5266a8-b697-48d4-8de6-52e2e2662acc',   // data endpoints
 });
 
-// 1. Exchange a LoginId (from Flinks Connect) for a RequestId.
-const auth = await flinks.authorize.authorize({ loginId });
+// The entire flow — authorize, MFA, poll, fetch — in ONE call:
+const result = await flinks.getAccountDetails(
+  { username: 'greatday_nomfa', password: 'Everyday', institution: 'FlinksCapital' },
+  { detail: { withTransactions: true } },
+);
 
-// 2. Fetch full account detail — the 202 → poll flow is handled for you.
-const detail = await flinks.connect.getAccountsDetailAndWait({
+if (result.status === 'done') {
+  for (const a of result.accounts) {
+    console.log(a.title, a.balance.current, a.currency, `${a.transactions?.length ?? 0} tx`);
+  }
+}
+```
+
+`bun run examples/quickstart.ts` runs it; `bun run test:sandbox` runs the live suite.
+
+## Quickstart (your account)
+
+```ts
+const flinks = new FlinksClient({
+  instance: 'toolbox',            // toolbox | sandbox | production
+  customerId: 'your-customer-guid',
+  secretKey: 'your-secret-key',   // flinks-auth-key on GenerateAuthorizeToken
+  xApiKey: 'your-x-api-key',      // x-api-key on data endpoints
+});
+```
+
+### One call, or step by step
+
+The one-call helper handles the authorize token, the 202→poll wait, and the 203
+MFA branch for you:
+
+```ts
+let res = await flinks.getAccountDetails({ loginId }); // from Flinks Connect
+while (res.status === 'mfa') {
+  const answers = await askUser(res.challenges);        // { [prompt]: [answer] }
+  res = await res.answer(answers);
+}
+console.log(res.accounts);
+```
+
+Prefer the raw endpoints? They're all still there:
+
+```ts
+const auth = await flinks.authorize.authorize({ loginId });   // token minted for you
+const detail = await flinks.connect.getAccountsDetailAndWait({ // 202→poll handled
   requestId: auth.requestId,
   withTransactions: true,
 });
-
-for (const account of detail.accounts ?? []) {
-  console.log(account.title, account.balance.current, account.currency);
-}
 ```
+
+### How auth works (so you're never confused)
+
+Flinks uses two keys, and this library routes each to the right place automatically:
+
+| Key | Header | Used on |
+| --- | --- | --- |
+| **Secret key** | `flinks-auth-key` | `GenerateAuthorizeToken` (mints authorize tokens) |
+| Authorize token | `flinks-auth-key` | `Authorize` (minted + cached for you) |
+| **x-api-key** | `x-api-key` | all data endpoints (accounts, statements, enrich) |
+| HMAC secret | — | verifying inbound webhooks |
 
 ## Next.js & React — the whole integration in ~15 lines
 
@@ -174,18 +224,42 @@ try {
 }
 ```
 
-## Verifying webhooks
+## Webhooks
+
+**Registering:** Flinks has no self-serve webhook API. You enable webhooks by
+opening a [Flinks Support](https://help.flinks.com/support/home) ticket with your
+**webhook URL** and **instance**; Flinks configures the callback server-side.
+Delivery: any non-`200` response is a failure, retried up to 10× at 30-min
+intervals — so verify fast and return `200`.
+
+**Receiving:** verify the HMAC-SHA256 signature (sent in the
+`flinks-authenticity-key` header) and get a typed, camelCased event:
 
 ```ts
-import { isWebhookValid } from '@rafey/flinks';
+import { handleFlinksWebhook } from '@rafey/flinks';
 
-// rawBody must be the exact bytes received, not the parsed object.
-if (!isWebhookValid(rawBody, req.headers['x-flinks-signature'], verificationKey)) {
-  return res.status(401).end();
+export async function POST(req: Request) {
+  const raw = await req.text(); // exact bytes — never re-serialize
+  let event;
+  try {
+    event = handleFlinksWebhook(raw, req.headers, process.env.FLINKS_HMAC_SECRET!);
+  } catch {
+    return new Response('bad signature', { status: 403 });
+  }
+
+  switch (event.responseType) {
+    case 'GetAccountsDetail': /* full account payload ready */ break;
+    case 'KYC':              /* holder identity fetched */    break;
+    case 'PayEvent':         /* payment status update */       break;
+    case 'UploadFraudAlert': /* fraud detected */              break;
+  }
+  return new Response('ok'); // must be 200 or Flinks retries
 }
 ```
 
-Comparison is constant-time, so signatures can't be brute-forced by timing.
+Verification is constant-time, so signatures can't be brute-forced by timing.
+Your custom `Tag` and the Flinks `loginId` come through on the event for
+correlating to your own records.
 
 ## Product coverage
 
@@ -207,7 +281,10 @@ Every namespace hangs off the one client:
 new FlinksClient({
   instance: 'toolbox',      // required — sets the API host
   customerId: '...',        // required — your Flinks customer GUID
-  apiSecret: '...',         // default auth for BankingServices / Enrich / Upload
+  secretKey: '...',         // mints authorize tokens (flinks-auth-key)
+  xApiKey: '...',           // data-endpoint auth (x-api-key)
+  hmacSecret: '...',        // verify inbound webhooks
+  authorizeToken: '...',    // optional — reuse a token instead of minting
   timeoutMs: 60_000,        // per-request timeout (default 60s)
   maxRetries: 2,            // transient-failure retries (default 2)
   fetch: customFetch,       // inject your own fetch (testing, proxies)
@@ -217,22 +294,21 @@ new FlinksClient({
 
 ## Test against your sandbox
 
-The suite runs fully offline. To exercise the real flow against your own
-toolbox/sandbox credentials, set env vars and run the sandbox test:
+The default `bun run test` suite is fully offline. The live suite hits Flinks'
+public sandbox with no setup:
+
+```bash
+bun run test:sandbox        # runs against the public Toolbox sandbox
+```
+
+Point it at your own instance by overriding env vars:
 
 ```bash
 FLINKS_INSTANCE=toolbox \
 FLINKS_CUSTOMER_ID=your-customer-guid \
-FLINKS_API_SECRET=your-api-secret \
-FLINKS_LOGIN_ID=a-sandbox-login-id \
+FLINKS_SECRET_KEY=your-secret-key \
+FLINKS_X_API_KEY=your-x-api-key \
 bun run test:sandbox
-```
-
-Or run the end-to-end example:
-
-```bash
-FLINKS_CUSTOMER_ID=... FLINKS_LOGIN_ID=... FLINKS_API_SECRET=... \
-bun run examples/quickstart.ts
 ```
 
 ## Development

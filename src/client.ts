@@ -6,7 +6,44 @@ import { UploadApi } from './products/upload/upload.js';
 import { UtilitiesApi } from './products/utilities/utilities.js';
 import { PayApi } from './products/pay/pay.js';
 import { OutboundApi } from './products/outbound/outbound.js';
+import type { PollOptions } from './core/poll.js';
+import type { AuthorizeOptions, SecurityChallenge } from './products/authorize/types.js';
+import type {
+  Account,
+  AccountsResponse,
+  GetAccountsDetailOptions,
+  GetAccountsSummaryOptions,
+} from './products/connect/types.js';
 import type { FlinksConfig, FlinksHosts } from './types/index.js';
+
+/** MFA is required — answer the challenges to continue the same flow. */
+export interface AccountsMfaRequired {
+  status: 'mfa';
+  requestId: string;
+  challenges: SecurityChallenge[];
+  /** Submit answers (keyed by challenge prompt) and continue. */
+  answer(responses: Record<string, string[]>): Promise<AccountsResult>;
+}
+
+/** The flow completed — accounts are ready. */
+export interface AccountsReady {
+  status: 'done';
+  requestId: string;
+  accounts: Account[];
+  /** The full underlying response, if you need more than `accounts`. */
+  raw: AccountsResponse;
+}
+
+export type AccountsResult = AccountsReady | AccountsMfaRequired;
+
+export interface GetAccountsFlowOptions {
+  /** Extra GetAccountsDetail flags (transactions, KYC, filters, …). */
+  detail?: Omit<GetAccountsDetailOptions, 'requestId'>;
+  /** Extra GetAccountsSummary flags. */
+  summary?: Omit<GetAccountsSummaryOptions, 'requestId'>;
+  /** Polling cadence for the async wait. */
+  poll?: PollOptions;
+}
 
 const defaultHosts = (instance: string): FlinksHosts => ({
   banking: `https://${instance}-api.private.fin.ag`,
@@ -45,23 +82,87 @@ export class FlinksClient {
       fetch: config.fetch,
     };
 
-    const keyAuth: AuthScheme = { type: 'flinks-auth-key', token: config.apiSecret ?? '' };
-    const bearerAuth: AuthScheme = { type: 'bearer', token: config.apiSecret ?? '' };
+    const secretKey = config.secretKey ?? config.apiSecret;
+    // Data endpoints authenticate with the `x-api-key` header.
+    const dataAuth: AuthScheme = { type: 'x-api-key', token: config.xApiKey ?? '' };
 
-    // BankingServices + Enrich authenticate with the `flinks-auth-key` header.
-    const bankingKey = new HttpClient({ baseUrl: hosts.banking, auth: keyAuth, ...shared });
-    // Upload + data-sharing utilities authenticate with a Bearer token.
-    const bankingBearer = new HttpClient({ baseUrl: hosts.banking, auth: bearerAuth, ...shared });
+    // One host for all BankingServices/Enrich/Upload/Utilities traffic. Authorize
+    // overrides the auth header per call (secret key / authorize token).
+    const banking = new HttpClient({ baseUrl: hosts.banking, auth: dataAuth, ...shared });
     // Pay and Outbound are token-minting hosts — no default auth.
     const pay = new HttpClient({ baseUrl: hosts.pay, auth: { type: 'none' }, ...shared });
     const outbound = new HttpClient({ baseUrl: hosts.outbound, auth: { type: 'none' }, ...shared });
 
-    this.authorize = new AuthorizeApi(bankingKey, bankingBase);
-    this.connect = new ConnectApi(bankingKey, bankingBase);
-    this.enrich = new EnrichApi(bankingKey, customerBase);
-    this.upload = new UploadApi(bankingBearer, customerBase);
-    this.utilities = new UtilitiesApi(bankingBearer, customerBase);
+    this.authorize = new AuthorizeApi(banking, bankingBase, secretKey, config.authorizeToken);
+    this.connect = new ConnectApi(banking, bankingBase);
+    this.enrich = new EnrichApi(banking, customerBase);
+    this.upload = new UploadApi(banking, customerBase);
+    this.utilities = new UtilitiesApi(banking, customerBase);
     this.pay = new PayApi(pay);
     this.outbound = new OutboundApi(outbound);
+  }
+
+  /**
+   * The whole account-aggregation flow in one call: authorize → (MFA) → poll →
+   * full account details. Handles the token, the 202 wait, and the 203 MFA
+   * branch for you.
+   *
+   * ```ts
+   * let res = await flinks.getAccountDetails({ loginId });
+   * while (res.status === 'mfa') {
+   *   const answers = await askUser(res.challenges); // { [prompt]: [answer] }
+   *   res = await res.answer(answers);
+   * }
+   * console.log(res.accounts);
+   * ```
+   */
+  getAccountDetails(
+    input: AuthorizeOptions,
+    options: GetAccountsFlowOptions = {},
+  ): Promise<AccountsResult> {
+    return this.runAccountsFlow('detail', input, options);
+  }
+
+  /** Same one-call flow as {@link getAccountDetails}, but the lighter summary. */
+  getAccountSummary(
+    input: AuthorizeOptions,
+    options: GetAccountsFlowOptions = {},
+  ): Promise<AccountsResult> {
+    return this.runAccountsFlow('summary', input, options);
+  }
+
+  private async runAccountsFlow(
+    mode: 'detail' | 'summary',
+    input: AuthorizeOptions,
+    options: GetAccountsFlowOptions,
+  ): Promise<AccountsResult> {
+    const auth = await this.authorize.authorize(input);
+
+    if (auth.httpStatusCode === 203) {
+      return {
+        status: 'mfa',
+        requestId: auth.requestId,
+        challenges: auth.securityChallenges ?? [],
+        answer: (responses) =>
+          this.runAccountsFlow(
+            mode,
+            { requestId: auth.requestId, securityResponses: responses },
+            options,
+          ),
+      };
+    }
+
+    const raw =
+      mode === 'detail'
+        ? await this.connect.getAccountsDetailAndWait(
+            { requestId: auth.requestId, ...options.detail },
+            options.poll,
+          )
+        : await this.connect.getAccountsSummaryAndWait(
+            { requestId: auth.requestId, ...options.summary },
+            options.poll,
+          );
+
+    return { status: 'done', requestId: auth.requestId, accounts: raw.accounts ?? [], raw };
   }
 }

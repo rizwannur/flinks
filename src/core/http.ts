@@ -17,6 +17,7 @@ export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 /** How a request authenticates. Products default to one but may override. */
 export type AuthScheme =
   | { type: 'flinks-auth-key'; token: string }
+  | { type: 'x-api-key'; token: string }
   | { type: 'bearer'; token: string }
   | { type: 'none' };
 
@@ -131,6 +132,7 @@ export class HttpClient {
 
     const auth = options.auth ?? this.auth;
     if (auth.type === 'flinks-auth-key') headers['flinks-auth-key'] = auth.token;
+    else if (auth.type === 'x-api-key') headers['x-api-key'] = auth.token;
     else if (auth.type === 'bearer') headers['Authorization'] = `Bearer ${auth.token}`;
 
     let body: string | undefined;
