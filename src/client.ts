@@ -6,6 +6,8 @@ import { UploadApi } from './products/upload/upload.js';
 import { UtilitiesApi } from './products/utilities/utilities.js';
 import { PayApi } from './products/pay/pay.js';
 import { OutboundApi } from './products/outbound/outbound.js';
+import { IdentityApi } from './products/identity/identity.js';
+import { WealthApi } from './products/wealth/wealth.js';
 import type { PollOptions } from './core/poll.js';
 import type { AuthorizeOptions, SecurityChallenge } from './products/authorize/types.js';
 import type {
@@ -49,6 +51,7 @@ const defaultHosts = (instance: string): FlinksHosts => ({
   banking: `https://${instance}-api.private.fin.ag`,
   pay: 'https://www.flinks.com',
   outbound: 'https://ob.flinksapp.com',
+  wealth: `https://${instance}-wealth-api.private.fin.ag`,
 });
 
 /**
@@ -70,6 +73,9 @@ export class FlinksClient {
   readonly utilities: UtilitiesApi;
   readonly pay: PayApi;
   readonly outbound: OutboundApi;
+  readonly identity: IdentityApi;
+  /** @deprecated Investments retires 2026-04-30. */
+  readonly wealth: WealthApi;
 
   constructor(config: FlinksConfig) {
     const hosts = { ...defaultHosts(config.instance), ...config.hosts };
@@ -92,14 +98,17 @@ export class FlinksClient {
     // Pay and Outbound are token-minting hosts — no default auth.
     const pay = new HttpClient({ baseUrl: hosts.pay, auth: { type: 'none' }, ...shared });
     const outbound = new HttpClient({ baseUrl: hosts.outbound, auth: { type: 'none' }, ...shared });
+    const wealth = new HttpClient({ baseUrl: hosts.wealth, auth: dataAuth, ...shared });
 
     this.authorize = new AuthorizeApi(banking, bankingBase, secretKey, config.authorizeToken);
     this.connect = new ConnectApi(banking, bankingBase);
     this.enrich = new EnrichApi(banking, customerBase);
     this.upload = new UploadApi(banking, customerBase);
     this.utilities = new UtilitiesApi(banking, customerBase);
-    this.pay = new PayApi(pay);
+    this.identity = new IdentityApi(banking, bankingBase);
+    this.pay = new PayApi(pay, { clientId: config.payClientId });
     this.outbound = new OutboundApi(outbound);
+    this.wealth = new WealthApi(wealth, customerBase);
   }
 
   /**

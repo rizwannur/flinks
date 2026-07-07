@@ -269,11 +269,16 @@ Every namespace hangs off the one client:
 | ------------------ | ------ |
 | `flinks.authorize` | `generateAuthorizeToken`, `authorize` (incl. MFA) |
 | `flinks.connect`   | accounts summary & detail (sync, async, and `*AndWait`), statements, MFA questions, delete card, institutions, routing-number lookup, scheduled/nightly refresh |
-| `flinks.enrich`    | income, credit-risk, lending, user-analysis, categorization, and all-attributes |
+| `flinks.enrich`    | income, credit-risk, lending, user-analysis & business attributes, request-specific attributes, categorization, prepayment optimization, attribute libraries, categories |
+| `flinks.identity`  | `fieldMatch` — verify name/address/email/phone against bank-verified data |
 | `flinks.upload`    | attribute upload, categorization, fraud analysis |
-| `flinks.pay`       | Flinks Pay session authorize |
+| `flinks.pay`       | session `authorize`; V2 sessions for e-Transfer, EFT & Guaranteed EFT (create/details/cancel/confirm-guarantee); legacy V1 EFT (transactions, schedules, contacts, PADs) |
 | `flinks.outbound`  | Open Banking — token, providers, recipients, registrations, revoke |
-| `flinks.utilities` | data-sharing `authSecret` grant & disable |
+| `flinks.utilities` | data-sharing `authSecret` grant / disable / enable |
+| `flinks.wealth`    | investments (get/delete) — **deprecated, retires 2026-04-30** |
+
+Plus the top-level `getAccountDetails` / `getAccountSummary` one-call helpers, and
+webhook verification (`handleFlinksWebhook`).
 
 ## Configuration
 
@@ -284,6 +289,7 @@ new FlinksClient({
   secretKey: '...',         // mints authorize tokens (flinks-auth-key)
   xApiKey: '...',           // data-endpoint auth (x-api-key)
   hmacSecret: '...',        // verify inbound webhooks
+  payClientId: '...',       // x-client-id for legacy Pay V1 EFT
   authorizeToken: '...',    // optional — reuse a token instead of minting
   timeoutMs: 60_000,        // per-request timeout (default 60s)
   maxRetries: 2,            // transient-failure retries (default 2)
