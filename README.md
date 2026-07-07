@@ -1,6 +1,6 @@
 <div align="center">
 
-# @rafey/flinks
+# flinks-node
 
 **A modern, fully-typed [Flinks](https://flinks.com) API client for Node.js & Bun.**
 
@@ -12,6 +12,9 @@ Every product. Every endpoint. Zero runtime dependencies.
 [![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
 </div>
+
+> **Community project — not affiliated with, endorsed by, or maintained by Flinks.**
+> "Flinks" is a trademark of its owner; this is an independent, unofficial client.
 
 ---
 
@@ -32,8 +35,8 @@ so you write **less code** and hit **fewer edge cases**.
 ## Install
 
 ```bash
-bun add @rafey/flinks
-# or: npm install @rafey/flinks
+bun add flinks-node
+# or: npm install flinks-node
 ```
 
 Requires Node 18+ or Bun (anything with a global `fetch`).
@@ -43,7 +46,7 @@ Requires Node 18+ or Bun (anything with a global `fetch`).
 Flinks publishes a shared Toolbox sandbox. This exact snippet runs as-is:
 
 ```ts
-import { FlinksClient } from '@rafey/flinks';
+import { FlinksClient } from 'flinks-node';
 
 const flinks = new FlinksClient({
   instance: 'toolbox',
@@ -122,7 +125,7 @@ calls Flinks methods directly, and the secret stays on the server.
 **1. Server route** (`app/api/flinks/route.ts`):
 
 ```ts
-import { createFlinksHandler } from '@rafey/flinks/next';
+import { createFlinksHandler } from 'flinks-node/next';
 
 export const { POST } = createFlinksHandler({
   instance: 'toolbox',
@@ -137,7 +140,7 @@ export const { POST } = createFlinksHandler({
 
 ```ts
 'use client';
-import { createFlinksClient } from '@rafey/flinks/react';
+import { createFlinksClient } from 'flinks-node/react';
 
 const flinks = createFlinksClient(); // POSTs to /api/flinks
 
@@ -145,22 +148,29 @@ const detail = await flinks.connect.getAccountsDetailAndWait({ requestId });
 //    ^ fully typed — autocomplete and return types, in the browser
 ```
 
-**3. Let users link their bank** with the Connect widget hook:
+**3. Let users link their bank** with the Connect widget hook. Mint the authorize
+token on your server (never ship the secret key), pass it to the widget, and
+receive the `loginId` when the user finishes:
 
 ```tsx
 'use client';
-import { useFlinksConnect } from '@rafey/flinks/react';
+import { useFlinksConnect } from 'flinks-node/react';
 
-export function LinkBank() {
+export function LinkBank({ authorizeToken }: { authorizeToken: string }) {
   const { iframeUrl } = useFlinksConnect({
     instance: 'toolbox',
+    authorizeToken,      // from GenerateAuthorizeToken on your server
+    demo: true,          // sandbox only — shows the Flinks Capital test bank
     onSuccess: ({ loginId }) => {
-      // send loginId to your server → authorize → fetch data
+      // POST loginId to your API → flinks.getAccountDetails({ loginId })
     },
   });
   return <iframe src={iframeUrl} width="100%" height={600} />;
 }
 ```
+
+The full loop: **server** mints the token (`generateAuthorizeToken`) → **widget**
+links the bank and returns a `loginId` → **server** calls `getAccountDetails({ loginId })`.
 
 > The `/next` handler uses only web-standard `Request`/`Response`, so the same
 > one-liner works in Remix, Hono, Bun.serve, and edge runtimes too.
@@ -182,7 +192,7 @@ const summary = await flinks.connect.getAccountsSummaryAndWait(
 Prefer to drive it yourself? The low-level pieces are all public:
 
 ```ts
-import { poll, isPending } from '@rafey/flinks';
+import { poll, isPending } from 'flinks-node';
 
 const first = await flinks.connect.getAccountsDetail({ requestId });
 const done = isPending(first)
@@ -211,7 +221,7 @@ while (res.httpStatusCode === 203) {
 ## Typed errors
 
 ```ts
-import { FlinksError } from '@rafey/flinks';
+import { FlinksError } from 'flinks-node';
 
 try {
   await flinks.connect.getAccountsSummary({ requestId });
@@ -236,7 +246,7 @@ intervals — so verify fast and return `200`.
 `flinks-authenticity-key` header) and get a typed, camelCased event:
 
 ```ts
-import { handleFlinksWebhook } from '@rafey/flinks';
+import { handleFlinksWebhook } from 'flinks-node';
 
 export async function POST(req: Request) {
   const raw = await req.text(); // exact bytes — never re-serialize

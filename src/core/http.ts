@@ -54,7 +54,11 @@ export interface HttpClientConfig {
   fetch?: typeof fetch;
 }
 
-const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+// 429/408 mean the request was never processed, so retrying is always safe.
+// Other 5xx are ambiguous for non-idempotent methods (the write may have landed),
+// so those are only retried for idempotent GETs.
+const ALWAYS_SAFE_STATUS = new Set([408, 429]);
+const IDEMPOTENT_5XX_STATUS = new Set([500, 502, 503, 504]);
 
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
@@ -83,6 +87,11 @@ export class HttpClient {
     const url = this.buildUrl(options.path, options.query);
     const init = this.buildInit(options);
 
+    // Retrying a POST/PATCH after a network error or ambiguous 5xx risks a
+    // duplicate side effect (e.g. a double payment), so only GETs get that
+    // treatment. 429/408 are always safe — the server never processed them.
+    const idempotent = options.method === 'GET';
+
     let lastError: unknown;
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       const controller = new AbortController();
@@ -94,7 +103,10 @@ export class HttpClient {
         });
         clearTimeout(timer);
 
-        if (RETRYABLE_STATUS.has(response.status) && attempt < this.maxRetries) {
+        const retryable =
+          ALWAYS_SAFE_STATUS.has(response.status) ||
+          (idempotent && IDEMPOTENT_5XX_STATUS.has(response.status));
+        if (retryable && attempt < this.maxRetries) {
           await sleep(this.backoff(attempt, response));
           continue;
         }
@@ -105,10 +117,13 @@ export class HttpClient {
         // FlinksError is a definitive API answer — never retry it.
         if (error instanceof FlinksError) throw error;
         lastError = error;
-        if (attempt < this.maxRetries) {
+        // A transport error on a non-idempotent request may still have been
+        // applied server-side — don't silently repeat it.
+        if (idempotent && attempt < this.maxRetries) {
           await sleep(this.backoff(attempt));
           continue;
         }
+        throw error;
       }
     }
     throw lastError;
