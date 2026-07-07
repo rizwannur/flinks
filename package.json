@@ -34,7 +34,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:sandbox": "vitest run tests/sandbox.test.ts",
+    "test:sandbox": "RUN_SANDBOX=1 vitest run tests/sandbox.test.ts",
     "lint": "eslint \"src/**/*.ts\"",
     "format": "prettier --write \"**/*.{ts,json,md}\"",
     "prepublishOnly": "npm run build"

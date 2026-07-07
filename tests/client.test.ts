@@ -6,7 +6,8 @@ const makeClient = (impl: typeof fetch) =>
   new FlinksClient({
     instance: 'toolbox',
     customerId: 'cust-123',
-    apiSecret: 'secret-key',
+    secretKey: 'secret-key',
+    xApiKey: 'x-api-key-123',
     maxRetries: 1,
     fetch: impl,
   });
@@ -18,25 +19,40 @@ const jsonResponse = (status: number, body: unknown): Response =>
   });
 
 describe('FlinksClient wiring', () => {
-  it('builds the right URL, auth header, and PascalCase body for authorize', async () => {
-    const fetchMock = vi.fn(async () => jsonResponse(200, { HttpStatusCode: 200, RequestId: 'req-1' }));
+  it('mints a token with the secret key, then authorizes with that token', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { HttpStatusCode: 200, Token: 'tok-abc' }))
+      .mockResolvedValueOnce(jsonResponse(200, { HttpStatusCode: 200, RequestId: 'req-1' }));
     const flinks = makeClient(fetchMock as unknown as typeof fetch);
 
     const res = await flinks.authorize.authorize({ loginId: 'login-9' });
-
     expect(res.requestId).toBe('req-1');
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe(
-      'https://toolbox-api.private.fin.ag/v3/cust-123/BankingServices/Authorize',
-    );
-    const headers = (init as RequestInit).headers as Record<string, string>;
-    expect(headers['flinks-auth-key']).toBe('secret-key');
-    expect(JSON.parse((init as RequestInit).body as string)).toMatchObject({
+
+    // 1st call: GenerateAuthorizeToken with the secret key.
+    const [genUrl, genInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(genUrl).toContain('/BankingServices/GenerateAuthorizeToken');
+    expect((genInit.headers as Record<string, string>)['flinks-auth-key']).toBe('secret-key');
+
+    // 2nd call: Authorize with the minted token + PascalCase body.
+    const [authUrl, authInit] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
+    expect(authUrl).toBe('https://toolbox-api.private.fin.ag/v3/cust-123/BankingServices/Authorize');
+    expect((authInit.headers as Record<string, string>)['flinks-auth-key']).toBe('tok-abc');
+    expect(JSON.parse(authInit.body as string)).toMatchObject({
       LoginId: 'login-9',
       MostRecentCached: true,
       Language: 'en',
       Save: true,
     });
+  });
+
+  it('sends the x-api-key header on data endpoints', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(200, { HttpStatusCode: 200, Accounts: [] }));
+    const flinks = makeClient(fetchMock as unknown as typeof fetch);
+
+    await flinks.connect.getAccountsSummary({ requestId: 'r' });
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Record<string, string>)['x-api-key']).toBe('x-api-key-123');
   });
 
   it('camelCases nested account responses', async () => {
@@ -85,6 +101,56 @@ describe('FlinksClient wiring', () => {
 
     await expect(flinks.connect.getInstitutions()).rejects.toBeInstanceOf(FlinksError);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('getAccountDetails runs authorize → detail in one call', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { HttpStatusCode: 200, Token: 'tok' }))
+      .mockResolvedValueOnce(jsonResponse(200, { HttpStatusCode: 200, RequestId: 'r1' }))
+      .mockResolvedValueOnce(
+        jsonResponse(200, { HttpStatusCode: 200, RequestId: 'r1', Accounts: [{ Title: 'Chequing' }] }),
+      );
+    const flinks = makeClient(fetchMock as unknown as typeof fetch);
+
+    const res = await flinks.getAccountDetails({ loginId: 'l1' });
+    expect(res.status).toBe('done');
+    if (res.status === 'done') {
+      expect(res.accounts).toHaveLength(1);
+      expect(res.accounts[0]!.title).toBe('Chequing');
+    }
+  });
+
+  it('getAccountDetails surfaces MFA and resumes via answer()', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { HttpStatusCode: 200, Token: 'tok' }))
+      .mockResolvedValueOnce(
+        jsonResponse(203, {
+          HttpStatusCode: 203,
+          RequestId: 'r1',
+          SecurityChallenges: [{ Prompt: 'Best country?', Type: 'QuestionAndAnswer' }],
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse(200, { HttpStatusCode: 200, RequestId: 'r1' }))
+      .mockResolvedValueOnce(
+        jsonResponse(200, { HttpStatusCode: 200, RequestId: 'r1', Accounts: [{ Title: 'Chequing' }] }),
+      );
+    const flinks = makeClient(fetchMock as unknown as typeof fetch);
+
+    const first = await flinks.getAccountDetails({ username: 'Greatday', password: 'Everyday' });
+    expect(first.status).toBe('mfa');
+    if (first.status !== 'mfa') return;
+    expect(first.challenges[0]!.prompt).toBe('Best country?');
+
+    const second = await first.answer({ 'Best country?': ['Canada'] });
+    expect(second.status).toBe('done');
+
+    // The MFA answer keys must reach Flinks verbatim (not PascalCased).
+    const answerCall = fetchMock.mock.calls[2] as unknown as [string, RequestInit];
+    const sentBody = JSON.parse(answerCall[1].body as string);
+    expect(sentBody.SecurityResponses).toEqual({ 'Best country?': ['Canada'] });
+    expect(sentBody.RequestId).toBe('r1');
   });
 
   it('uses Bearer auth + snake_case for the outbound token call', async () => {

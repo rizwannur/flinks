@@ -21,6 +21,8 @@ export interface AuthorizeOptions {
   requestId?: string;
   /** MFA answers, keyed by challenge prompt. */
   securityResponses?: Record<string, string[]>;
+  /** Override the authorize token for this call (else one is minted/cached). */
+  authorizeToken?: string;
 }
 
 export interface SecurityChallenge {
@@ -40,6 +42,6 @@ export interface AuthorizeResponse extends FlinksResponseBase {
 }
 
 export interface GenerateAuthorizeTokenResponse extends FlinksResponseBase {
-  /** The Authorize Token (RequestId), valid 30 minutes of inactivity. */
-  requestId: string;
+  /** The Authorize Token, valid 30 minutes of inactivity. */
+  token: string;
 }

@@ -4,13 +4,32 @@
 
 export { FlinksClient } from './client.js';
 export { FlinksClient as default } from './client.js';
+export type {
+  AccountsResult,
+  AccountsReady,
+  AccountsMfaRequired,
+  GetAccountsFlowOptions,
+} from './client.js';
 
 // Errors & codes
 export { FlinksError, type FlinksErrorBody } from './core/errors.js';
 export { flinksCodeDescriptions } from './core/flinks-codes.js';
 
-// Webhook authenticity
-export { isWebhookValid, signMessage } from './core/authenticity.js';
+// Webhooks — verify inbound callbacks (Flinks has no registration API; you
+// enable webhooks via a Support ticket, then verify + parse deliveries here).
+export {
+  isWebhookValid,
+  signMessage,
+  verifyFlinksWebhook,
+  FLINKS_WEBHOOK_SIGNATURE_HEADER,
+} from './core/authenticity.js';
+export {
+  handleFlinksWebhook,
+  parseFlinksWebhook,
+  WebhookVerificationError,
+  type FlinksWebhookEvent,
+  type FlinksWebhookType,
+} from './core/webhooks.js';
 
 // Async polling helpers
 export { poll, isPending, type PollOptions } from './core/poll.js';

@@ -11,10 +11,23 @@ export interface FlinksConfig {
   /** Your Flinks customer GUID (a.k.a. customerId). */
   customerId: string;
   /**
-   * Your API secret. Used as the default `flinks-auth-key` for BankingServices
-   * and Enrich, and as the Bearer token for Upload and data-sharing utilities.
-   * Optional if you pass per-call tokens instead.
+   * Your **secret key**. Sent as `flinks-auth-key` on `/GenerateAuthorizeToken`
+   * to mint authorize tokens. Never expose this to the browser.
    */
+  secretKey?: string;
+  /**
+   * Your **x-api-key**. Sent as the `x-api-key` header on all data endpoints
+   * (GetAccountsDetail/Summary, statements, enrich, etc.).
+   */
+  xApiKey?: string;
+  /** Your **HMAC secret**, used to verify inbound webhook signatures. */
+  hmacSecret?: string;
+  /**
+   * A pre-obtained authorize token to reuse across `/Authorize` calls. If
+   * omitted, one is minted automatically from `secretKey` when needed.
+   */
+  authorizeToken?: string;
+  /** @deprecated Use `secretKey`. Kept as an alias for a smooth migration. */
   apiSecret?: string;
   /** Request timeout in milliseconds. Default 60_000. */
   timeoutMs?: number;
