@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write # create the GitHub Release
-  id-token: write # npm provenance (supply-chain attestation)
 
 jobs:
   publish:
@@ -49,7 +48,8 @@ jobs:
           fi
 
       - name: Publish to npm
-        run: npm publish --access public --provenance
+        # Provenance is intentionally omitted — it requires a public repo.
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
