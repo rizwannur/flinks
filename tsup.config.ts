@@ -10,7 +10,7 @@ export default defineConfig({
   format: ['esm', 'cjs'],
   dts: true,
   clean: true,
-  sourcemap: true,
+  sourcemap: false,
   treeshake: true,
   target: 'es2022',
   outExtension: ({ format }) => ({ js: format === 'cjs' ? '.cjs' : '.js' }),

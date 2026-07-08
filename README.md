@@ -189,6 +189,17 @@ export function LinkBank({ authorizeToken }: { authorizeToken: string }) {
 The full loop: **server** mints the token (`generateAuthorizeToken`) → **widget**
 links the bank and returns a `loginId` → **server** calls `getAccountDetails({ loginId })`.
 
+Don't want to fetch the token yourself? Point the hook at a backend route that
+mints one and it handles the round-trip for you:
+
+```tsx
+const { iframeUrl } = useFlinksConnect({
+  instance: 'toolbox',
+  tokenEndpoint: '/api/flinks/token', // POST → { token }; minted on mount
+  onSuccess: ({ loginId }) => linkAccount(loginId),
+});
+```
+
 > The `/next` handler uses only web-standard `Request`/`Response`, so the same
 > one-liner works in Remix, Hono, Bun.serve, and edge runtimes too.
 
@@ -248,6 +259,22 @@ try {
     err.httpStatusCode;    // 401
     err.description;       // 'The provided LoginId, username, or password is invalid.'
   }
+}
+```
+
+A request that exceeds `timeoutMs` throws a typed **`FlinksTimeoutError`** (distinct
+from a caller cancellation), and every call accepts an `AbortSignal` so you can
+cancel it yourself:
+
+```ts
+import { FlinksTimeoutError } from '@rizwannur/flinks';
+
+const controller = new AbortController();
+setTimeout(() => controller.abort(), 5_000);
+try {
+  await flinks.connect.getAccountsDetailAndWait({ requestId }, { signal: controller.signal });
+} catch (err) {
+  if (err instanceof FlinksTimeoutError) { /* the request itself timed out */ }
 }
 ```
 

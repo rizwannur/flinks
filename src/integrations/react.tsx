@@ -16,7 +16,7 @@
  *    users link their bank through) and hands you the `loginId` on success.
  */
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { FlinksClient } from '../client.js';
 
 // ── Typed browser client ─────────────────────────────────────────────────────
@@ -91,6 +91,15 @@ export interface UseFlinksConnectOptions {
    * mint the token server-side and pass only the token here.
    */
   authorizeToken?: string;
+  /**
+   * Instead of passing `authorizeToken` yourself, point this at a backend route
+   * that mints one (POST → `{ token }`). The hook fetches it on mount so you
+   * skip the manual token round-trip. Ignored if `authorizeToken` is set.
+   *
+   * The route is typically a thin wrapper over
+   * `flinks.authorize.generateAuthorizeToken()`.
+   */
+  tokenEndpoint?: string;
   /** Sandbox mode — adds `demo=true` so the Flinks Capital test bank appears. */
   demo?: boolean;
   /** Where Flinks redirects after linking (also arrives via postMessage). */
@@ -119,19 +128,40 @@ export interface UseFlinksConnectOptions {
  * ```
  */
 export function useFlinksConnect(options: UseFlinksConnectOptions): { iframeUrl: string } {
-  const { instance, authorizeToken, demo, redirectUrl, tag, params, onSuccess, onEvent } = options;
+  const { instance, authorizeToken, tokenEndpoint, demo, redirectUrl, tag, params, onSuccess, onEvent } =
+    options;
+
+  // Auto-mint the token from a backend route when one isn't supplied directly.
+  const [fetchedToken, setFetchedToken] = useState<string | undefined>();
+  useEffect(() => {
+    if (authorizeToken || !tokenEndpoint) return;
+    let cancelled = false;
+    void fetch(tokenEndpoint, { method: 'POST' })
+      .then((r) => r.json() as Promise<{ token?: string }>)
+      .then((d) => {
+        if (!cancelled) setFetchedToken(d.token);
+      })
+      .catch(() => {
+        /* leave the widget tokenless; the caller can surface the failure */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authorizeToken, tokenEndpoint]);
+
+  const token = authorizeToken ?? fetchedToken;
 
   const iframeUrl = useMemo(() => {
     const url = new URL(`https://${instance}-iframe.private.fin.ag/v2/`);
     if (demo) url.searchParams.set('demo', 'true');
-    if (authorizeToken) url.searchParams.set('authorizeToken', authorizeToken);
+    if (token) url.searchParams.set('authorizeToken', token);
     if (redirectUrl) url.searchParams.set('redirectUrl', redirectUrl);
     if (tag) url.searchParams.set('tag', tag);
     for (const [key, value] of Object.entries(params ?? {})) {
       url.searchParams.set(key, value);
     }
     return url.toString();
-  }, [instance, authorizeToken, demo, redirectUrl, tag, params]);
+  }, [instance, token, demo, redirectUrl, tag, params]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
