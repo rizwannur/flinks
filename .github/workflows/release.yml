@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: write # create the GitHub Release
-  id-token: write # npm provenance attestation (OIDC)
+  # id-token: write # uncomment for npm provenance once the repo is public
 
 jobs:
   publish:
@@ -49,8 +49,9 @@ jobs:
           fi
 
       - name: Publish to npm
-        # Provenance enabled — repo is public, so npm can attest build origin.
-        run: npm publish --access public --provenance
+        # Provenance omitted while the repo is private — it requires a public
+        # repo. When you flip the repo to public, add `--provenance` here.
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
