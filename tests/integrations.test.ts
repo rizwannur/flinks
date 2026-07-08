@@ -18,6 +18,7 @@ describe('Next handler', () => {
     instance: 'toolbox',
     customerId: 'c',
     apiSecret: 's',
+    xApiKey: 'k',
     allow: ['connect.getInstitutions'],
     fetch: fetchMock as unknown as typeof fetch,
   });

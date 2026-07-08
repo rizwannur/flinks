@@ -10,7 +10,7 @@
  */
 
 import { toPascalCase, toCamelCase } from './case.js';
-import { FlinksError, type FlinksErrorBody } from './errors.js';
+import { FlinksError, FlinksTimeoutError, type FlinksErrorBody } from './errors.js';
 
 export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
@@ -41,6 +41,8 @@ export interface RequestOptions {
   transformRequest?: boolean;
   /** Set false to return the response body verbatim (no camelCase transform). */
   transformResponse?: boolean;
+  /** Caller cancellation. Aborting rejects with the caller's own AbortError. */
+  signal?: AbortSignal;
 }
 
 export interface HttpClientConfig {
@@ -92,16 +94,30 @@ export class HttpClient {
     // treatment. 429/408 are always safe — the server never processed them.
     const idempotent = options.method === 'GET';
 
+    // A caller cancellation that has already fired should never reach the wire.
+    if (options.signal?.aborted) throw options.signal.reason ?? new Error('Aborted');
+
     let lastError: unknown;
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+      let timedOut = false;
+      const timer = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, this.timeoutMs);
+      // Forward a caller's cancellation to this attempt's controller.
+      const onCallerAbort = () => controller.abort();
+      options.signal?.addEventListener('abort', onCallerAbort, { once: true });
+      const cleanup = (): void => {
+        clearTimeout(timer);
+        options.signal?.removeEventListener('abort', onCallerAbort);
+      };
       try {
         const response = await this.fetchImpl(url, {
           ...init,
           signal: controller.signal,
         });
-        clearTimeout(timer);
+        cleanup();
 
         const retryable =
           ALWAYS_SAFE_STATUS.has(response.status) ||
@@ -113,17 +129,23 @@ export class HttpClient {
 
         return await this.handleResponse<T>(response, options);
       } catch (error) {
-        clearTimeout(timer);
+        cleanup();
         // FlinksError is a definitive API answer — never retry it.
         if (error instanceof FlinksError) throw error;
-        lastError = error;
-        // A transport error on a non-idempotent request may still have been
-        // applied server-side — don't silently repeat it.
+        // A deliberate caller cancellation is final — surface it, don't retry.
+        if (options.signal?.aborted) throw options.signal.reason ?? error;
+        // Our own timeout: replace the opaque AbortError with a typed error.
+        const surfaced = timedOut
+          ? new FlinksTimeoutError(options.endpoint, this.timeoutMs)
+          : error;
+        lastError = surfaced;
+        // A transport error (or timeout) on a non-idempotent request may still
+        // have been applied server-side — don't silently repeat it.
         if (idempotent && attempt < this.maxRetries) {
           await sleep(this.backoff(attempt));
           continue;
         }
-        throw error;
+        throw surfaced;
       }
     }
     throw lastError;
@@ -147,8 +169,17 @@ export class HttpClient {
 
     const auth = options.auth ?? this.auth;
     if (auth.type === 'flinks-auth-key') headers['flinks-auth-key'] = auth.token;
-    else if (auth.type === 'x-api-key') headers['x-api-key'] = auth.token;
-    else if (auth.type === 'bearer') headers['Authorization'] = `Bearer ${auth.token}`;
+    else if (auth.type === 'x-api-key') {
+      // Fail loudly rather than sending an empty key and getting an opaque 401.
+      if (!auth.token) {
+        throw new Error(
+          `Flinks ${options.endpoint} needs an API key. Pass \`xApiKey\` to ` +
+            `FlinksClient — data endpoints (Connect, Enrich, Upload, Identity) ` +
+            `authenticate with the x-api-key header.`,
+        );
+      }
+      headers['x-api-key'] = auth.token;
+    } else if (auth.type === 'bearer') headers['Authorization'] = `Bearer ${auth.token}`;
 
     let body: string | undefined;
     if (options.form) {
@@ -171,7 +202,9 @@ export class HttpClient {
     options: RequestOptions,
   ): Promise<T> {
     const text = await response.text();
-    const parsed: unknown = text ? safeJsonParse(text) : undefined;
+    const { value: parsed, jsonOk } = text
+      ? tryJsonParse(text)
+      : { value: undefined, jsonOk: true };
 
     if (!response.ok) {
       const raw = (isRecord(parsed) ? parsed : {}) as Record<string, unknown>;
@@ -184,7 +217,21 @@ export class HttpClient {
       throw new FlinksError(options.endpoint, errorBody);
     }
 
+    // Caller asked for the raw body — hand it back untouched (text or parsed).
     if (options.transformResponse === false) return parsed as T;
+
+    // A 2xx with a non-empty body that isn't valid JSON means something is
+    // wrong upstream (a truncated response, or an HTML proxy/gateway page
+    // returned with status 200). Returning that string cast to T would
+    // silently corrupt the caller's data model, so fail loudly instead.
+    if (!jsonOk) {
+      throw new FlinksError(options.endpoint, {
+        httpStatusCode: response.status,
+        message: `Expected a JSON response but received a non-JSON body: ${text.slice(0, 200)}`,
+        body: text,
+      });
+    }
+
     return toCamelCase<T>(parsed);
   }
 
@@ -200,11 +247,13 @@ export class HttpClient {
   }
 }
 
-const safeJsonParse = (text: string): unknown => {
+// Parses JSON but reports whether it actually succeeded, so callers can tell a
+// genuine JSON string (`"hi"`) apart from a body that failed to parse.
+const tryJsonParse = (text: string): { value: unknown; jsonOk: boolean } => {
   try {
-    return JSON.parse(text);
+    return { value: JSON.parse(text), jsonOk: true };
   } catch {
-    return text;
+    return { value: text, jsonOk: false };
   }
 };
 

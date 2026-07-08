@@ -1,4 +1,5 @@
 import type { HttpClient } from '../../core/http.js';
+import { pathParam } from '../../core/params.js';
 import type { FlinksResponseBase } from '../../types/index.js';
 
 /**
@@ -64,7 +65,7 @@ export class EnrichApi {
   private insight(name: string, { loginId, requestId }: AttributesQuery, endpoint: string) {
     return this.http.request<AttributesResponse>({
       method: 'GET',
-      path: `${this.customerBase}/insight/login/${loginId}/attributes/${requestId}/${name}`,
+      path: `${this.customerBase}/insight/login/${pathParam(loginId, 'loginId')}/attributes/${pathParam(requestId, 'requestId')}/${name}`,
       endpoint,
     });
   }
@@ -110,7 +111,7 @@ export class EnrichApi {
     const { loginId, requestId, ...body } = options;
     return this.http.request({
       method: 'POST',
-      path: `${this.customerBase}/insight/login/${loginId}/attributes/${requestId}`,
+      path: `${this.customerBase}/insight/login/${pathParam(loginId, 'loginId')}/attributes/${pathParam(requestId, 'requestId')}`,
       endpoint: 'requestAttributes',
       body,
     });
@@ -121,7 +122,7 @@ export class EnrichApi {
   getCategorization({ loginId, requestId }: AttributesQuery): Promise<AttributesResponse> {
     return this.http.request({
       method: 'GET',
-      path: `${this.customerBase}/categorization/login/${loginId}/requestid/${requestId}`,
+      path: `${this.customerBase}/categorization/login/${pathParam(loginId, 'loginId')}/requestid/${pathParam(requestId, 'requestId')}`,
       endpoint: 'getCategorization',
     });
   }
@@ -133,7 +134,7 @@ export class EnrichApi {
     const { loginId, requestId, ...body } = options;
     return this.http.request({
       method: 'POST',
-      path: `${this.customerBase}/prepayment/login/${loginId}/${requestId}`,
+      path: `${this.customerBase}/prepayment/login/${pathParam(loginId, 'loginId')}/${pathParam(requestId, 'requestId')}`,
       endpoint: 'prepayment',
       body,
     });

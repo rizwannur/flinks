@@ -22,8 +22,6 @@ export interface FlinksConfig {
   xApiKey?: string;
   /** Your **HMAC secret**, used to verify inbound webhook signatures. */
   hmacSecret?: string;
-  /** Flinks Pay **x-client-id** API key, for the legacy V1 EFT endpoints. */
-  payClientId?: string;
   /**
    * A pre-obtained authorize token to reuse across `/Authorize` calls. If
    * omitted, one is minted automatically from `secretKey` when needed.

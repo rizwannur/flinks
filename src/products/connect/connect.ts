@@ -1,4 +1,5 @@
 import type { HttpClient } from '../../core/http.js';
+import { pathParam } from '../../core/params.js';
 import { poll, isPending, type PollOptions } from '../../core/poll.js';
 import type {
   AccountsResponse,
@@ -42,7 +43,7 @@ export class ConnectApi {
   getAccountsSummaryAsync(requestId: string): Promise<AccountsResponse> {
     return this.http.request({
       method: 'GET',
-      path: `${this.basePath}/GetAccountsSummaryAsync/${requestId}`,
+      path: `${this.basePath}/GetAccountsSummaryAsync/${pathParam(requestId, 'requestId')}`,
       endpoint: 'getAccountsSummaryAsync',
     });
   }
@@ -72,7 +73,7 @@ export class ConnectApi {
   getAccountsDetailAsync(requestId: string): Promise<AccountsResponse> {
     return this.http.request({
       method: 'GET',
-      path: `${this.basePath}/GetAccountsDetailAsync/${requestId}`,
+      path: `${this.basePath}/GetAccountsDetailAsync/${pathParam(requestId, 'requestId')}`,
       endpoint: 'getAccountsDetailAsync',
       headers: { Accept: 'application/json' },
     });
@@ -103,7 +104,7 @@ export class ConnectApi {
   getMfaQuestions(loginId: string): Promise<MfaQuestionsResponse> {
     return this.http.request({
       method: 'GET',
-      path: `${this.basePath}/GetMFAQuestions/${loginId}`,
+      path: `${this.basePath}/GetMFAQuestions/${pathParam(loginId, 'loginId')}`,
       endpoint: 'getMfaQuestions',
     });
   }
@@ -120,7 +121,7 @@ export class ConnectApi {
   deleteCard(loginId: string): Promise<SimpleResponse> {
     return this.http.request({
       method: 'DELETE',
-      path: `${this.basePath}/DeleteCard/${loginId}`,
+      path: `${this.basePath}/DeleteCard/${pathParam(loginId, 'loginId')}`,
       endpoint: 'deleteCard',
     });
   }
@@ -136,7 +137,7 @@ export class ConnectApi {
   getInstitutionByRoutingNumber(routingNumber: string): Promise<RoutingNumberResponse> {
     return this.http.request({
       method: 'GET',
-      path: `${this.basePath}/Institutions/RoutingNumber/${routingNumber}`,
+      path: `${this.basePath}/Institutions/RoutingNumber/${pathParam(routingNumber, 'routingNumber')}`,
       endpoint: 'getInstitutionByRoutingNumber',
     });
   }

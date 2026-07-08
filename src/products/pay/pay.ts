@@ -1,4 +1,21 @@
 import type { HttpClient } from '../../core/http.js';
+import { pathParam } from '../../core/params.js';
+
+/**
+ * Flinks Pay — Interac e-Transfer and EFT payments.
+ *
+ * @experimental Flinks Pay runs on a **client-provisioned host** that is not
+ * publicly documented (the OpenAPI spec redacts it as `www.{baseurl}.com`, and
+ * it is delivered to you at onboarding). You MUST supply it via
+ * `new FlinksClient({ hosts: { pay: 'https://…' } })` — there is no usable
+ * default. These methods follow the published Pay OpenAPI spec
+ * (https://docs.flinks.com/openapi-pay.yaml) but could not be verified against a
+ * live sandbox, so treat the shapes as best-effort until you confirm against
+ * your provisioned instance.
+ *
+ * Flow: {@link authorize} → {@link initiateSession} → {@link createPaymentRequest}
+ * → poll {@link getPaymentRequest}.
+ */
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -11,45 +28,22 @@ export interface PayAuthorizeOptions {
 
 export interface PayAuthorizeResponse {
   accessToken: string;
-  tokenType: string;
-  /** Lifetime in seconds (default 299). Tokens are single-use per session. */
-  expiresIn: number;
+  tokenType?: string;
+  /** Lifetime in seconds. */
+  expiresIn?: number;
 }
 
-// ── V2 sessions (e-Transfer, EFT, GEFT) ──────────────────────────────────────
-
-export interface PartyAddress {
-  addressLine1?: string;
-  city?: string;
-  postalCode?: string;
-  province?: string;
-  country?: string;
-}
-
-export interface PartyInfo {
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  address?: PartyAddress;
-}
-
-export interface SessionOptions {
-  guarantee?: { enable: boolean };
-  notificationPreferences?: { language?: string };
-  showConsentScreen?: boolean;
-}
+// ── Sessions ─────────────────────────────────────────────────────────────────
 
 export interface InitiateSessionOptions {
-  type: 'EFT' | 'e-Transfer';
-  /** Defaults to `DEBIT` in the session helpers. */
-  direction?: 'DEBIT' | 'CREDIT';
-  currency?: 'CAD';
-  /** Optional — if omitted, the user enters it in the hosted flow. */
-  amount?: number;
-  referenceId?: string;
-  payor?: PartyInfo;
-  payee?: PartyInfo | null;
-  options?: SessionOptions;
+  /** Your correlation id, echoed back on the session and webhooks. */
+  referenceId: string;
+  /** Amount as a string per the Pay spec (e.g. `"12.50"`). */
+  amount: string;
+  customerName: string;
+  customerEmail: string;
+  /** Redirect URLs the hosted flow returns to. */
+  clientURIs?: Record<string, string>;
 }
 
 export interface InitiateSessionResponse {
@@ -57,82 +51,40 @@ export interface InitiateSessionResponse {
   referenceId?: string;
 }
 
-export interface SessionDetails {
-  sessionId: string;
-  referenceId?: string;
-  type?: string;
-  status?: string;
-  statusDetails?: unknown;
-  amount?: number;
+// ── Payment requests ─────────────────────────────────────────────────────────
+
+export interface PaymentRequestResponse {
+  requestId: string;
   [key: string]: unknown;
 }
 
-// ── V1 EFT (legacy, x-client-id) ─────────────────────────────────────────────
-
-export interface EftScheduleInfo {
-  paymentFrequency: 'OneTime' | 'Weekly' | 'Biweekly' | 'Monthly';
-  startDate: string;
-  endDate?: string;
-  transactionsCount?: number;
+export interface PaymentRequestStatus {
+  requestId: string;
+  status?: string;
+  [key: string]: unknown;
 }
 
-export interface CreateEftTransaction {
-  transactionCode: number;
-  amount: number;
-  paymentDirection: 'DEBIT' | 'CREDIT';
-  currency: 'CAD';
-  scheduleInfo: EftScheduleInfo;
-  description?: string;
-  crossReferenceNumber?: string;
-  purposeCategory?: string;
-  payor?: Record<string, unknown>;
-  payee?: Record<string, unknown>;
-}
-
-/**
- * Flinks Pay — Interac e-Transfer and EFT payments. Lives on its own host.
- *
- * Modern flow (recommended): call {@link authorize} once to mint a session
- * token, then use the V2 session helpers — {@link createETransferSession},
- * {@link createEftSession}, {@link createGuaranteedEftSession} — which all
- * resolve to the shared `/api/v2/sessions` resource. Legacy V1 EFT
- * (`x-client-id`) is also available via {@link createEftTransactionV1} etc.
- */
 export class PayApi {
   private accessToken?: string;
-  private clientId?: string;
 
-  constructor(private readonly http: HttpClient, options?: { clientId?: string }) {
-    this.clientId = options?.clientId;
-  }
+  constructor(private readonly http: HttpClient) {}
 
   /** Reuse a token obtained elsewhere. */
   setAccessToken(token: string): void {
     this.accessToken = token;
   }
 
-  /** Set the `x-client-id` API key used by the legacy V1 EFT endpoints. */
-  setClientId(clientId: string): void {
-    this.clientId = clientId;
-  }
-
-  private bearer() {
+  // Pay data calls carry the access token in a `BearerToken` header (not the
+  // standard `Authorization: Bearer`), per the Pay OpenAPI spec.
+  private authHeaders(): Record<string, string> {
     if (!this.accessToken) {
       throw new Error('Pay: no access token. Call authorize() or setAccessToken() first.');
     }
-    return { type: 'bearer' as const, token: this.accessToken };
-  }
-
-  private clientHeaders(): Record<string, string> {
-    if (!this.clientId) {
-      throw new Error('Pay V1 EFT: no clientId. Pass { clientId } or call setClientId().');
-    }
-    return { 'x-client-id': this.clientId };
+    return { BearerToken: this.accessToken };
   }
 
   /**
-   * Mint a Flinks Pay session token and store it. Credentials are form-encoded;
-   * the returned `accessToken` is single-use — call this again per session.
+   * Mint a Flinks Pay access token and store it. Credentials are form-encoded.
    */
   async authorize(options: PayAuthorizeOptions): Promise<PayAuthorizeResponse> {
     const result = await this.http.request<PayAuthorizeResponse>({
@@ -150,143 +102,53 @@ export class PayApi {
     return result;
   }
 
-  // ── V2 sessions ─────────────────────────────────────────────────────────────
-
-  /** Create a payment session (the low-level shared endpoint). */
-  createSession(options: InitiateSessionOptions): Promise<InitiateSessionResponse> {
+  /** Initiate a payment session. Returns the `sessionId` used downstream. */
+  initiateSession(options: InitiateSessionOptions): Promise<InitiateSessionResponse> {
     return this.http.request({
       method: 'POST',
-      path: '/api/v2/sessions',
-      endpoint: 'createSession',
-      auth: this.bearer(),
+      path: '/api/v1/sessions/initiate',
+      endpoint: 'payInitiateSession',
+      auth: { type: 'none' },
+      headers: this.authHeaders(),
       body: options,
       transformRequest: false, // Pay speaks camelCase JSON, not PascalCase
     });
   }
 
-  /** Create an Interac e-Transfer (Request Money) session. */
-  createETransferSession(
-    options: Omit<InitiateSessionOptions, 'type'>,
-  ): Promise<InitiateSessionResponse> {
-    return this.createSession({
-      ...options,
-      type: 'e-Transfer',
-      direction: options.direction ?? 'DEBIT',
-      currency: options.currency ?? 'CAD',
-    });
-  }
-
-  /** Create a regular EFT (Pre-Authorized Debit) session. */
-  createEftSession(
-    options: Omit<InitiateSessionOptions, 'type'>,
-  ): Promise<InitiateSessionResponse> {
-    return this.createSession({
-      ...options,
-      type: 'EFT',
-      direction: options.direction ?? 'DEBIT',
-      currency: options.currency ?? 'CAD',
-      options: { ...options.options, guarantee: { enable: false } },
-    });
-  }
-
-  /** Create a Guaranteed EFT (GEFT) session. */
-  createGuaranteedEftSession(
-    options: Omit<InitiateSessionOptions, 'type'>,
-  ): Promise<InitiateSessionResponse> {
-    return this.createSession({
-      ...options,
-      type: 'EFT',
-      direction: options.direction ?? 'DEBIT',
-      currency: options.currency ?? 'CAD',
-      options: { ...options.options, guarantee: { enable: true } },
-    });
-  }
-
-  /** Retrieve full session information and status. */
-  getSessionDetails(sessionId: string): Promise<SessionDetails> {
-    return this.http.request({
-      method: 'GET',
-      path: `/api/v2/sessions/${sessionId}/details`,
-      endpoint: 'getSessionDetails',
-      auth: this.bearer(),
-    });
-  }
-
-  /** Terminate an active session. */
-  cancelSession(sessionId: string): Promise<unknown> {
+  /** Send the payment request to the customer for an initiated session. */
+  sendSessionRequest(sessionId: string): Promise<unknown> {
     return this.http.request({
       method: 'POST',
-      path: `/api/v2/sessions/${sessionId}/cancel`,
-      endpoint: 'cancelSession',
-      auth: this.bearer(),
-    });
-  }
-
-  /** Accept or reject a GEFT guarantee (used with the webhook flow). */
-  confirmGuarantee(sessionId: string, guaranteeAccepted: boolean): Promise<InitiateSessionResponse> {
-    return this.http.request({
-      method: 'POST',
-      path: `/api/v2/sessions/${sessionId}/guarantees/confirm`,
-      endpoint: 'confirmGuarantee',
-      auth: this.bearer(),
-      body: { guaranteeAccepted },
+      path: '/api/v1/sessions/sendrequest',
+      endpoint: 'paySendSessionRequest',
+      auth: { type: 'none' },
+      headers: this.authHeaders(),
+      body: { sessionId },
       transformRequest: false,
     });
   }
 
-  // ── V1 EFT (legacy) ─────────────────────────────────────────────────────────
-
-  /** Create a legacy V1 EFT transaction. Authenticated with `x-client-id`. */
-  createEftTransactionV1(transaction: CreateEftTransaction): Promise<unknown> {
+  /** Activate a session into a payment request. Returns the `requestId`. */
+  createPaymentRequest(sessionId: string): Promise<PaymentRequestResponse> {
     return this.http.request({
       method: 'POST',
-      path: '/api/v1/transactions',
-      endpoint: 'createEftTransactionV1',
+      path: '/api/v1/paymentrequests',
+      endpoint: 'payCreatePaymentRequest',
       auth: { type: 'none' },
-      headers: this.clientHeaders(),
-      body: [transaction], // the endpoint expects an array of exactly one
-      transformRequest: false, // Pay speaks camelCase JSON, not PascalCase
+      headers: this.authHeaders(),
+      body: { sessionId },
+      transformRequest: false,
     });
   }
 
-  getSchedule(scheduleId: string): Promise<unknown> {
+  /** Poll a payment request by id for its current status. */
+  getPaymentRequest(requestId: string): Promise<PaymentRequestStatus> {
     return this.http.request({
       method: 'GET',
-      path: `/api/v1/schedules/${scheduleId}`,
-      endpoint: 'getSchedule',
+      path: `/api/v1/paymentrequests/${pathParam(requestId, 'requestId')}`,
+      endpoint: 'payGetPaymentRequest',
       auth: { type: 'none' },
-      headers: this.clientHeaders(),
-    });
-  }
-
-  cancelSchedule(scheduleId: string): Promise<unknown> {
-    return this.http.request({
-      method: 'POST',
-      path: `/api/v1/schedules/${scheduleId}/cancel`,
-      endpoint: 'cancelSchedule',
-      auth: { type: 'none' },
-      headers: this.clientHeaders(),
-    });
-  }
-
-  getContact(contactId: string): Promise<unknown> {
-    return this.http.request({
-      method: 'GET',
-      path: `/api/v1/contacts/${contactId}`,
-      endpoint: 'getContact',
-      auth: { type: 'none' },
-      headers: this.clientHeaders(),
-    });
-  }
-
-  /** Get a PAD agreement, including the `padLink` to present for signing. */
-  getPadAgreement(padId: string): Promise<unknown> {
-    return this.http.request({
-      method: 'GET',
-      path: `/api/v1/pads/${padId}`,
-      endpoint: 'getPadAgreement',
-      auth: { type: 'none' },
-      headers: this.clientHeaders(),
+      headers: this.authHeaders(),
     });
   }
 }

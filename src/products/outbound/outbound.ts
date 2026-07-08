@@ -1,5 +1,6 @@
 import type { HttpClient } from '../../core/http.js';
 import { toSnakeCase } from '../../core/case.js';
+import { pathParam } from '../../core/params.js';
 
 export interface OutboundTokenOptions {
   /** `client_credentials` or `authorization_code`. */
@@ -99,7 +100,7 @@ export class OutboundApi {
   listDataProviders(country?: string): Promise<unknown> {
     return this.http.request({
       method: 'GET',
-      path: '/api/v2/providers',
+      path: '/api/v1/providers',
       endpoint: 'listDataProviders',
       auth: this.bearer(),
       query: { country },
@@ -135,7 +136,7 @@ export class OutboundApi {
   regenerateSecret(clientId: string): Promise<DataRecipient> {
     return this.http.request({
       method: 'POST',
-      path: `/api/v1/recipients/${clientId}/secret`,
+      path: `/api/v1/recipients/${pathParam(clientId, 'clientId')}/secret`,
       endpoint: 'regenerateSecret',
       auth: this.bearer(),
     });
@@ -145,7 +146,7 @@ export class OutboundApi {
   updateDataRecipient(clientId: string, redirectUris: string): Promise<DataRecipient> {
     return this.http.request({
       method: 'PUT',
-      path: `/api/v1/recipients/${clientId}`,
+      path: `/api/v1/recipients/${pathParam(clientId, 'clientId')}`,
       endpoint: 'updateDataRecipient',
       auth: this.bearer(),
       body: { redirect_uris: redirectUris },
@@ -157,7 +158,7 @@ export class OutboundApi {
   getRegistrationStatus(clientId: string): Promise<RegistrationStatus[]> {
     return this.http.request({
       method: 'GET',
-      path: `/api/v1/recipients/${clientId}/providers/requests`,
+      path: `/api/v1/recipients/${pathParam(clientId, 'clientId')}/providers/requests`,
       endpoint: 'getRegistrationStatus',
       auth: this.bearer(),
     });

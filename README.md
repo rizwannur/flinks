@@ -299,13 +299,20 @@ Every namespace hangs off the one client:
 | `flinks.enrich`    | income, credit-risk, lending, user-analysis & business attributes, request-specific attributes, categorization, prepayment optimization, attribute libraries, categories |
 | `flinks.identity`  | `fieldMatch` — verify name/address/email/phone against bank-verified data |
 | `flinks.upload`    | attribute upload, categorization, fraud analysis |
-| `flinks.pay`       | session `authorize`; V2 sessions for e-Transfer, EFT & Guaranteed EFT (create/details/cancel/confirm-guarantee); legacy V1 EFT (transactions, schedules, contacts, PADs) |
+| `flinks.pay` ⚠️     | `authorize` → `initiateSession` → `createPaymentRequest` → poll `getPaymentRequest` (Interac e-Transfer / EFT). **Experimental** — Pay runs on a client-provisioned host you must set via `hosts.pay`; see note below |
 | `flinks.outbound`  | Open Banking — token, providers, recipients, registrations, revoke |
 | `flinks.utilities` | data-sharing `authSecret` grant / disable / enable |
 | `flinks.wealth`    | investments (get/delete) — **deprecated, retires 2026-04-30** |
 
 Plus the top-level `getAccountDetails` / `getAccountSummary` one-call helpers, and
-webhook verification (`handleFlinksWebhook`).
+webhook verification (`flinks.webhooks.handle` or the standalone `handleFlinksWebhook`).
+
+> ⚠️ **Flinks Pay is experimental.** It follows the published Pay OpenAPI spec but
+> could not be verified against a live sandbox, and Flinks serves Pay from a
+> **client-provisioned host** that is delivered to you at onboarding (there is no
+> public default). You must supply it explicitly:
+> `new FlinksClient({ hosts: { pay: 'https://your-pay-host' }, ... })`.
+> All other products run against the standard Flinks hosts out of the box.
 
 ## ⚙️ Configuration
 
@@ -316,7 +323,6 @@ new FlinksClient({
   secretKey: '...',         // mints authorize tokens (flinks-auth-key)
   xApiKey: '...',           // data-endpoint auth (x-api-key)
   hmacSecret: '...',        // verify inbound webhooks
-  payClientId: '...',       // x-client-id for legacy Pay V1 EFT
   authorizeToken: '...',    // optional — reuse a token instead of minting
   timeoutMs: 60_000,        // per-request timeout (default 60s)
   maxRetries: 2,            // transient-failure retries (default 2)

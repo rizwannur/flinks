@@ -1,4 +1,5 @@
 import type { HttpClient } from '../../core/http.js';
+import { pathParam } from '../../core/params.js';
 import type { FlinksResponseBase } from '../../types/index.js';
 
 export interface GetInvestmentsOptions {
@@ -39,7 +40,7 @@ export class WealthApi {
   deleteInvestments(loginId: string): Promise<FlinksResponseBase> {
     return this.http.request({
       method: 'DELETE',
-      path: `${this.customerBase}/Investments/Delete/${loginId}`,
+      path: `${this.customerBase}/Investments/Delete/${pathParam(loginId, 'loginId')}`,
       endpoint: 'deleteInvestments',
     });
   }

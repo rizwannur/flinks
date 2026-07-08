@@ -10,7 +10,7 @@ const client = (impl: typeof fetch) =>
     customerId: 'c',
     secretKey: 's',
     xApiKey: 'k',
-    payClientId: 'pcid',
+    hosts: { pay: 'https://pay.example.com' },
     fetch: impl,
   });
 
@@ -48,8 +48,8 @@ describe('identity', () => {
   });
 });
 
-describe('pay V2 sessions', () => {
-  it('createEftSession sets type=EFT and guarantee disabled, with Bearer auth', async () => {
+describe('pay (v1 sessions → payment requests)', () => {
+  it('initiateSession posts to /api/v1/sessions/initiate with the BearerToken header', async () => {
     const f = vi
       .fn()
       .mockResolvedValueOnce(json(200, { access_token: 'ptok', token_type: 'Bearer', expires_in: 299 }))
@@ -57,41 +57,51 @@ describe('pay V2 sessions', () => {
     const flinks = client(f as unknown as typeof fetch);
 
     await flinks.pay.authorize({ username: 'u', password: 'p' });
-    const res = await flinks.pay.createEftSession({ amount: 50, payor: { firstName: 'A' } });
+    const res = await flinks.pay.initiateSession({
+      referenceId: 'ref',
+      amount: '50.00',
+      customerName: 'A B',
+      customerEmail: 'a@b.co',
+    });
     expect(res.sessionId).toBe('sess-1');
 
     const [url, init] = lastCall(f);
-    expect(url).toBe('https://www.flinks.com/api/v2/sessions');
-    expect((init.headers as Record<string, string>)['Authorization']).toBe('Bearer ptok');
+    expect(url).toBe('https://pay.example.com/api/v1/sessions/initiate');
+    expect((init.headers as Record<string, string>)['BearerToken']).toBe('ptok');
     const body = JSON.parse(init.body as string);
-    expect(body.type).toBe('EFT');
-    expect(body.options.guarantee.enable).toBe(false);
+    expect(body.amount).toBe('50.00'); // sent verbatim (camelCase), not PascalCased
+    expect(body.customerEmail).toBe('a@b.co');
   });
 
-  it('createGuaranteedEftSession enables the guarantee', async () => {
+  it('createPaymentRequest activates a session and getPaymentRequest polls it', async () => {
     const f = vi
       .fn()
       .mockResolvedValueOnce(json(200, { access_token: 't', token_type: 'Bearer', expires_in: 1 }))
-      .mockResolvedValueOnce(json(201, { sessionId: 's' }));
+      .mockResolvedValueOnce(json(201, { requestId: 'rq-1' }))
+      .mockResolvedValueOnce(json(200, { requestId: 'rq-1', status: 'Completed' }));
     const flinks = client(f as unknown as typeof fetch);
     await flinks.pay.authorize({ username: 'u', password: 'p' });
-    await flinks.pay.createGuaranteedEftSession({ amount: 10 });
-    expect(JSON.parse(lastCall(f)[1].body as string).options.guarantee.enable).toBe(true);
+
+    const created = await flinks.pay.createPaymentRequest('sess-1');
+    expect(created.requestId).toBe('rq-1');
+    expect(lastCall(f)[0]).toBe('https://pay.example.com/api/v1/paymentrequests');
+
+    const status = await flinks.pay.getPaymentRequest('rq-1');
+    expect(status.status).toBe('Completed');
+    expect(lastCall(f)[0]).toBe('https://pay.example.com/api/v1/paymentrequests/rq-1');
   });
 
-  it('V1 EFT uses the x-client-id header and wraps the body in an array', async () => {
-    const f = vi.fn(async () => json(200, { schedules: [] }));
+  it('throws a clear error if used before authorize()', async () => {
+    const f = vi.fn(async () => json(200, {}));
     const flinks = client(f as unknown as typeof fetch);
-    await flinks.pay.createEftTransactionV1({
-      transactionCode: 700,
-      amount: 5,
-      paymentDirection: 'DEBIT',
-      currency: 'CAD',
-      scheduleInfo: { paymentFrequency: 'OneTime', startDate: '2026-08-01' },
-    });
-    const [url, init] = lastCall(f);
-    expect(url).toBe('https://www.flinks.com/api/v1/transactions');
-    expect((init.headers as Record<string, string>)['x-client-id']).toBe('pcid');
-    expect(Array.isArray(JSON.parse(init.body as string))).toBe(true);
+    expect(() =>
+      flinks.pay.initiateSession({
+        referenceId: 'r',
+        amount: '1',
+        customerName: 'n',
+        customerEmail: 'e@x.co',
+      }),
+    ).toThrow(/no access token/i);
+    expect(f).not.toHaveBeenCalled();
   });
 });

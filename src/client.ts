@@ -8,6 +8,11 @@ import { PayApi } from './products/pay/pay.js';
 import { OutboundApi } from './products/outbound/outbound.js';
 import { IdentityApi } from './products/identity/identity.js';
 import { WealthApi } from './products/wealth/wealth.js';
+import {
+  handleFlinksWebhook,
+  parseFlinksWebhook,
+  type FlinksWebhookEvent,
+} from './core/webhooks.js';
 import type { PollOptions } from './core/poll.js';
 import type { AuthorizeOptions, SecurityChallenge } from './products/authorize/types.js';
 import type {
@@ -49,7 +54,9 @@ export interface GetAccountsFlowOptions {
 
 const defaultHosts = (instance: string): FlinksHosts => ({
   banking: `https://${instance}-api.private.fin.ag`,
-  pay: 'https://www.flinks.com',
+  // Flinks Pay runs on a client-provisioned host delivered at onboarding; there
+  // is no public default. Supply it via `hosts.pay` before using `flinks.pay`.
+  pay: '',
   outbound: 'https://ob.flinksapp.com',
   wealth: `https://${instance}-wealth-api.private.fin.ag`,
 });
@@ -76,6 +83,16 @@ export class FlinksClient {
   readonly identity: IdentityApi;
   /** @deprecated Investments retires 2026-04-30. */
   readonly wealth: WealthApi;
+  /**
+   * Verify and parse inbound Flinks webhooks. `handle` uses the `hmacSecret`
+   * from your client config; `parse` skips verification.
+   */
+  readonly webhooks: {
+    /** Verify the HMAC signature and return the typed event. Throws on a bad/missing signature. */
+    handle(rawBody: string, headers: Headers | Record<string, string | string[] | undefined>): FlinksWebhookEvent;
+    /** Parse a raw body into a typed event without verifying the signature. */
+    parse(rawBody: string): FlinksWebhookEvent;
+  };
 
   constructor(config: FlinksConfig) {
     const hosts = { ...defaultHosts(config.instance), ...config.hosts };
@@ -95,8 +112,14 @@ export class FlinksClient {
     // One host for all BankingServices/Enrich/Upload/Utilities traffic. Authorize
     // overrides the auth header per call (secret key / authorize token).
     const banking = new HttpClient({ baseUrl: hosts.banking, auth: dataAuth, ...shared });
-    // Pay and Outbound are token-minting hosts — no default auth.
-    const pay = new HttpClient({ baseUrl: hosts.pay, auth: { type: 'none' }, ...shared });
+    // Pay and Outbound are token-minting hosts — no default auth. Pay's host is
+    // provisioned per client; a placeholder keeps URL construction valid and
+    // produces a clear error rather than a cryptic one when it's left unset.
+    const pay = new HttpClient({
+      baseUrl: hosts.pay || 'https://pay-host-not-configured.invalid',
+      auth: { type: 'none' },
+      ...shared,
+    });
     const outbound = new HttpClient({ baseUrl: hosts.outbound, auth: { type: 'none' }, ...shared });
     const wealth = new HttpClient({ baseUrl: hosts.wealth, auth: dataAuth, ...shared });
 
@@ -106,9 +129,23 @@ export class FlinksClient {
     this.upload = new UploadApi(banking, customerBase);
     this.utilities = new UtilitiesApi(banking, customerBase);
     this.identity = new IdentityApi(banking, bankingBase);
-    this.pay = new PayApi(pay, { clientId: config.payClientId });
+    this.pay = new PayApi(pay);
     this.outbound = new OutboundApi(outbound);
     this.wealth = new WealthApi(wealth, customerBase);
+
+    const hmacSecret = config.hmacSecret;
+    this.webhooks = {
+      handle: (rawBody, headers) => {
+        if (!hmacSecret) {
+          throw new Error(
+            'FlinksClient.webhooks.handle needs `hmacSecret` in the client config. ' +
+              'Pass it, or call the standalone handleFlinksWebhook(raw, headers, secret).',
+          );
+        }
+        return handleFlinksWebhook(rawBody, headers, hmacSecret);
+      },
+      parse: parseFlinksWebhook,
+    };
   }
 
   /**
