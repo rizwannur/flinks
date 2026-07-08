@@ -47,13 +47,18 @@
   },
   "keywords": [
     "flinks",
+    "flinks-api",
     "banking",
+    "banking-api",
     "fintech",
     "open-banking",
     "financial-data",
     "api-client",
     "typescript",
-    "bun"
+    "nodejs",
+    "node",
+    "bun",
+    "canada"
   ],
   "author": "Rafey",
   "license": "MIT",

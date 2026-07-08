@@ -12,7 +12,7 @@ export type {
 } from './client.js';
 
 // Errors & codes
-export { FlinksError, type FlinksErrorBody } from './core/errors.js';
+export { FlinksError, FlinksTimeoutError, type FlinksErrorBody } from './core/errors.js';
 export { flinksCodeDescriptions } from './core/flinks-codes.js';
 
 // Webhooks — verify inbound callbacks (Flinks has no registration API; you

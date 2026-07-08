@@ -18,12 +18,26 @@ const isPlainObject = (value: unknown): value is Record<string, Json> =>
 const pascalCase = (key: string): string =>
   key.replace(/(^|[-_ ])([a-z])/g, (_, __, c: string) => c.toUpperCase());
 
-// Handles PascalCase (`LoginId`), snake_case (`access_token`), and kebab-case,
-// so both BankingServices and the OAuth-style Outbound/Pay hosts normalize.
-const camelCase = (key: string): string =>
-  key
-    .replace(/[-_ ](\w)/g, (_, c: string) => c.toUpperCase())
-    .replace(/^(\w)/, (_, c: string) => c.toLowerCase());
+// Handles PascalCase (`LoginId`), snake_case (`access_token`), kebab-case, and
+// all-caps acronyms (`IBAN`→`iban`, `HTTPStatusCode`→`httpStatusCode`), so both
+// BankingServices and the OAuth-style Outbound/Pay hosts normalize cleanly. A
+// naive first-char lowercase leaves `iBAN`/`hTTPStatusCode`, which break
+// destructuring, so split into words first.
+const camelCase = (key: string): string => {
+  const words = key
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2') // HTTPStatus -> HTTP Status
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2') // fooBar -> foo Bar
+    .replace(/[-_ ]+/g, ' ')
+    .trim()
+    .split(/\s+/);
+  return words
+    .map((w, i) =>
+      i === 0
+        ? w.toLowerCase()
+        : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(),
+    )
+    .join('');
+};
 
 const snakeCase = (key: string): string =>
   key

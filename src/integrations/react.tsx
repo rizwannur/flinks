@@ -139,7 +139,10 @@ export function useFlinksConnect(options: UseFlinksConnectOptions): { iframeUrl:
       const data = event.data as FlinksConnectEvent | undefined;
       if (!data || typeof data !== 'object') return;
       onEvent?.(data);
-      if (data.loginId || data.step === 'REDIRECT') onSuccess?.(data);
+      // Only a real completion carries a loginId. Firing onSuccess on a bare
+      // REDIRECT step handed callers an event with loginId === undefined, so
+      // gate strictly on loginId — use onEvent for the raw REDIRECT stream.
+      if (data.loginId) onSuccess?.(data);
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);

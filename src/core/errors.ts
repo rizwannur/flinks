@@ -42,3 +42,21 @@ export class FlinksError extends Error {
     this.body = body;
   }
 }
+
+/**
+ * Thrown when a request exceeds its `timeoutMs`. Distinct from a caller-supplied
+ * `AbortSignal` cancellation (which surfaces the caller's own `AbortError`), so
+ * callers can branch on `error instanceof FlinksTimeoutError` to retry vs. give
+ * up on a deliberate cancellation.
+ */
+export class FlinksTimeoutError extends Error {
+  readonly endpoint: string;
+  readonly timeoutMs: number;
+
+  constructor(endpoint: string, timeoutMs: number) {
+    super(`Flinks ${endpoint} timed out after ${timeoutMs}ms`);
+    this.name = 'FlinksTimeoutError';
+    this.endpoint = endpoint;
+    this.timeoutMs = timeoutMs;
+  }
+}
