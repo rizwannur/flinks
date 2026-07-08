@@ -1,0 +1,19 @@
+name: Deprecate old package name
+
+# One-off: deprecate @rizwannur/flinks-node in favour of @rizwannur/flinks.
+# Uses the CI npm token so no OTP is needed. Delete this file after running.
+on:
+  workflow_dispatch:
+
+jobs:
+  deprecate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Deprecate old name
+        run: npm deprecate @rizwannur/flinks-node "Renamed — install @rizwannur/flinks instead."
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
