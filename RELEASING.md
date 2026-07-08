@@ -22,11 +22,13 @@ This bumps `package.json`, commits, tags `vX.Y.Z`, and pushes the tag. The
 
 1. typechecks, tests, and builds,
 2. verifies the tag matches `package.json`,
-3. `npm publish --access public --provenance`,
+3. `npm publish --access public` (add `--provenance` once the repo is public),
 4. creates a GitHub Release with auto-generated notes.
 
 Update `CHANGELOG.md` before releasing.
 
-> The repo is public, so npm publishes with **provenance** — a signed
-> attestation linking the published tarball to this repo and the exact CI
-> run that built it. Provenance requires `id-token: write` in the workflow.
+> The repo is currently **private**, so npm publishes without provenance —
+> repo visibility and npm publishing are independent. When you flip the repo
+> to public, enable **provenance** (a signed attestation linking the tarball
+> to this repo and the CI run that built it): add `--provenance` to the
+> publish step and uncomment `id-token: write` in the release workflow.
