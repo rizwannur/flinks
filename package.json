@@ -1,5 +1,5 @@
 {
-  "name": "@rizwannur/flinks-node",
+  "name": "@rizwannur/flinks",
   "version": "0.1.0",
   "publishConfig": {
     "access": "public"
@@ -59,11 +59,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rizwannur/flinks-node.git"
+    "url": "git+https://github.com/rizwannur/flinks.git"
   },
-  "homepage": "https://github.com/rizwannur/flinks-node#readme",
+  "homepage": "https://github.com/rizwannur/flinks#readme",
   "bugs": {
-    "url": "https://github.com/rizwannur/flinks-node/issues"
+    "url": "https://github.com/rizwannur/flinks/issues"
   },
   "peerDependencies": {
     "react": ">=18"

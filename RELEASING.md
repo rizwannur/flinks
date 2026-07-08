@@ -27,5 +27,6 @@ This bumps `package.json`, commits, tags `vX.Y.Z`, and pushes the tag. The
 
 Update `CHANGELOG.md` before releasing.
 
-> The package (`@rizwannur/flinks-node`) can be published while the GitHub repo
-> stays private — repo visibility and npm publishing are independent.
+> The repo is public, so npm publishes with **provenance** — a signed
+> attestation linking the published tarball to this repo and the exact CI
+> run that built it. Provenance requires `id-token: write` in the workflow.

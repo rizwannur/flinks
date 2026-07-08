@@ -1,14 +1,14 @@
 # Contributing
 
-Thanks for helping improve `@rizwannur/flinks-node` — a community, unofficial
+Thanks for helping improve `@rizwannur/flinks` — a community, unofficial
 Flinks client. Contributions of all sizes are welcome: bug fixes, new endpoints,
 docs, and tests.
 
 ## Getting started
 
 ```bash
-git clone https://github.com/rizwannur/flinks-node
-cd flinks-node
+git clone https://github.com/rizwannur/flinks
+cd flinks
 bun install
 ```
 

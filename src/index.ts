@@ -1,5 +1,5 @@
 /**
- * flinks-node — a modern, fully-typed Flinks API client for Node.js and Bun.
+ * flinks — a modern, fully-typed Flinks API client for Node.js and Bun.
  */
 
 export { FlinksClient } from './client.js';
