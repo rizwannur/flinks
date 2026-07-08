@@ -25,13 +25,32 @@ import { FlinksClient } from '../client.js';
 import { FlinksError } from '../core/errors.js';
 import type { FlinksConfig } from '../types/index.js';
 
+// Callable member names of one product namespace.
+type MethodNames<T> = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [K in keyof T]: T[K] extends (...args: any[]) => any ? K : never;
+}[keyof T] &
+  string;
+
+/**
+ * Every valid `"<product>.<method>"` path on the client, e.g.
+ * `"connect.getAccountsDetail"`. Powers autocomplete on `allow`.
+ */
+export type FlinksMethodPath = {
+  [P in keyof FlinksClient]: FlinksClient[P] extends object
+    ? `${P & string}.${MethodNames<FlinksClient[P]>}`
+    : never;
+}[keyof FlinksClient];
+
 export interface FlinksHandlerConfig extends FlinksConfig {
   /**
    * Allowlist of `"<product>.<method>"` strings the browser may call. Strongly
    * recommended — without it, every method (including `connect.deleteCard`) is
    * reachable from the client. Omit only for trusted server-to-server use.
+   *
+   * Typed for autocomplete, but any string is accepted (custom composite paths).
    */
-  allow?: string[];
+  allow?: ReadonlyArray<FlinksMethodPath | (string & {})>;
 }
 
 interface RpcBody {

@@ -60,7 +60,10 @@
     "bun",
     "canada"
   ],
-  "author": "Rafey",
+  "author": {
+    "name": "Rizwan Nur",
+    "url": "https://github.com/rizwannur"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
