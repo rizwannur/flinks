@@ -6,7 +6,7 @@
  *
  * ```ts
  * // app/api/flinks/route.ts
- * import { createFlinksHandler } from '@rizwannur/flinks-node/next';
+ * import { createFlinksHandler } from '@rizwannur/flinks/next';
  *
  * export const { POST } = createFlinksHandler({
  *   instance: 'toolbox',
@@ -16,7 +16,7 @@
  * });
  * ```
  *
- * The browser client in `flinks-node/react` talks to this route. Uses only
+ * The browser client in `flinks/react` talks to this route. Uses only
  * web-standard `Request`/`Response`, so it needs no `next` dependency and also
  * works in any fetch-based runtime (Remix, Hono, Bun.serve, edge functions).
  */

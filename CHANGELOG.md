@@ -28,5 +28,5 @@ Node.js and Bun.
 - Retry-safety: only idempotent GETs retry on 5xx/network; non-idempotent
   writes (payments) are never silently repeated.
 
-[Unreleased]: https://github.com/rizwannur/flinks-node/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/rizwannur/flinks-node/releases/tag/v0.1.0
+[Unreleased]: https://github.com/rizwannur/flinks/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/rizwannur/flinks/releases/tag/v0.1.0
